@@ -3,20 +3,27 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Quran Hifdh Tracker API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: students
+    description: Student management
+  - name: entries
+    description: Daily entry management
+  - name: stats
+    description: Statistics and KPIs
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +31,352 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Teacher login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Teacher logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/session:
+    get:
+      operationId: getSession
+      tags: [auth]
+      summary: Get current session
+      responses:
+        "200":
+          description: Session info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /students:
+    get:
+      operationId: listStudents
+      tags: [students]
+      summary: List all students
+      parameters:
+        - name: active
+          in: query
+          schema:
+            type: boolean
+          description: Filter by active status
+      responses:
+        "200":
+          description: List of students
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Student"
+    post:
+      operationId: createStudent
+      tags: [students]
+      summary: Create a new student
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStudentRequest"
+      responses:
+        "201":
+          description: Student created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+
+  /students/{id}:
+    get:
+      operationId: getStudent
+      tags: [students]
+      summary: Get student by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Student details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateStudent
+      tags: [students]
+      summary: Update a student
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStudentRequest"
+      responses:
+        "200":
+          description: Student updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+
+  /students/{studentId}/entries:
+    get:
+      operationId: listEntries
+      tags: [entries]
+      summary: List daily entries for a student
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: month
+          in: query
+          schema:
+            type: string
+          description: "Filter by month (YYYY-MM format)"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DailyEntry"
+
+  /students/{studentId}/entries/{date}:
+    get:
+      operationId: getEntry
+      tags: [entries]
+      summary: Get entry for a specific date
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Daily entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyEntry"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: upsertEntry
+      tags: [entries]
+      summary: Create or update entry for a date
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertEntryRequest"
+      responses:
+        "200":
+          description: Entry saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyEntry"
+
+  /students/{studentId}/stats:
+    get:
+      operationId: getStudentStats
+      tags: [stats]
+      summary: Get student KPIs
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Student statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentStats"
+
+  /students/{studentId}/calendar/{yearMonth}:
+    get:
+      operationId: getStudentCalendar
+      tags: [stats]
+      summary: Get monthly calendar data for a student
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: yearMonth
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "YYYY-MM format"
+      responses:
+        "200":
+          description: Calendar data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarData"
+
+  /stats/class:
+    get:
+      operationId: getClassStats
+      tags: [stats]
+      summary: Get class-wide statistics
+      responses:
+        "200":
+          description: Class statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClassStats"
+
+  /students/{studentId}/today-status:
+    get:
+      operationId: getStudentTodayStatus
+      tags: [entries]
+      summary: Get today's completion status for a student
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Today status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodayStatus"
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [stats]
+      summary: Get dashboard data with all students and today status
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DashboardStudent"
+
+  /surahs:
+    get:
+      operationId: listSurahs
+      tags: [health]
+      summary: List all 114 surahs with ayah counts
+      responses:
+        "200":
+          description: List of surahs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SurahInfo"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +387,457 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    LoginRequest:
+      type: object
+      properties:
+        password:
+          type: string
+      required:
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        authenticated:
+          type: boolean
+      required:
+        - authenticated
+
+    Student:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        currentSurah:
+          type: integer
+        currentAyah:
+          type: integer
+        startDate:
+          type: string
+          format: date
+        notes:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - currentSurah
+        - currentAyah
+        - startDate
+        - active
+        - createdAt
+
+    CreateStudentRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        currentSurah:
+          type: integer
+        currentAyah:
+          type: integer
+        startDate:
+          type: string
+          format: date
+        notes:
+          type: string
+          nullable: true
+      required:
+        - name
+        - currentSurah
+        - currentAyah
+        - startDate
+
+    UpdateStudentRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        currentSurah:
+          type: integer
+        currentAyah:
+          type: integer
+        notes:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+
+    Grade:
+      type: string
+      enum:
+        - excellent
+        - good
+        - needs_repeat
+        - incomplete
+
+    DailyEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        studentId:
+          type: integer
+        date:
+          type: string
+          format: date
+        newMemorizationFromSurah:
+          type: integer
+          nullable: true
+        newMemorizationFromAyah:
+          type: integer
+          nullable: true
+        newMemorizationToSurah:
+          type: integer
+          nullable: true
+        newMemorizationToAyah:
+          type: integer
+          nullable: true
+        newMemorizationCompleted:
+          type: boolean
+        newMemorizationGrade:
+          $ref: "#/components/schemas/Grade"
+          nullable: true
+        rmvFromSurah:
+          type: integer
+          nullable: true
+        rmvFromAyah:
+          type: integer
+          nullable: true
+        rmvToSurah:
+          type: integer
+          nullable: true
+        rmvToAyah:
+          type: integer
+          nullable: true
+        rmvCompleted:
+          type: boolean
+        rmvGrade:
+          $ref: "#/components/schemas/Grade"
+          nullable: true
+        reviewFromSurah:
+          type: integer
+          nullable: true
+        reviewFromAyah:
+          type: integer
+          nullable: true
+        reviewToSurah:
+          type: integer
+          nullable: true
+        reviewToAyah:
+          type: integer
+          nullable: true
+        reviewCompleted:
+          type: boolean
+        reviewGrade:
+          $ref: "#/components/schemas/Grade"
+          nullable: true
+        extraReviewFromSurah:
+          type: integer
+          nullable: true
+        extraReviewFromAyah:
+          type: integer
+          nullable: true
+        extraReviewToSurah:
+          type: integer
+          nullable: true
+        extraReviewToAyah:
+          type: integer
+          nullable: true
+        teacherNotes:
+          type: string
+          nullable: true
+        daySuccessful:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - studentId
+        - date
+        - newMemorizationCompleted
+        - rmvCompleted
+        - reviewCompleted
+        - daySuccessful
+        - createdAt
+
+    UpsertEntryRequest:
+      type: object
+      properties:
+        newMemorizationFromSurah:
+          type: integer
+          nullable: true
+        newMemorizationFromAyah:
+          type: integer
+          nullable: true
+        newMemorizationToSurah:
+          type: integer
+          nullable: true
+        newMemorizationToAyah:
+          type: integer
+          nullable: true
+        newMemorizationCompleted:
+          type: boolean
+        newMemorizationGrade:
+          $ref: "#/components/schemas/Grade"
+          nullable: true
+        rmvFromSurah:
+          type: integer
+          nullable: true
+        rmvFromAyah:
+          type: integer
+          nullable: true
+        rmvToSurah:
+          type: integer
+          nullable: true
+        rmvToAyah:
+          type: integer
+          nullable: true
+        rmvCompleted:
+          type: boolean
+        rmvGrade:
+          $ref: "#/components/schemas/Grade"
+          nullable: true
+        reviewFromSurah:
+          type: integer
+          nullable: true
+        reviewFromAyah:
+          type: integer
+          nullable: true
+        reviewToSurah:
+          type: integer
+          nullable: true
+        reviewToAyah:
+          type: integer
+          nullable: true
+        reviewCompleted:
+          type: boolean
+        reviewGrade:
+          $ref: "#/components/schemas/Grade"
+          nullable: true
+        extraReviewFromSurah:
+          type: integer
+          nullable: true
+        extraReviewFromAyah:
+          type: integer
+          nullable: true
+        extraReviewToSurah:
+          type: integer
+          nullable: true
+        extraReviewToAyah:
+          type: integer
+          nullable: true
+        teacherNotes:
+          type: string
+          nullable: true
+      required:
+        - newMemorizationCompleted
+        - rmvCompleted
+        - reviewCompleted
+
+    StudentStats:
+      type: object
+      properties:
+        studentId:
+          type: integer
+        totalAyahsMemorized:
+          type: integer
+        totalQuranPercentage:
+          type: number
+          format: float
+        juzCompleted:
+          type: integer
+        successfulDaysPercent:
+          type: number
+          format: float
+        currentStreak:
+          type: integer
+        thisMonthSuccessRate:
+          type: number
+          format: float
+        ayahsMemorizedThisMonth:
+          type: integer
+        ayahsMemorizedThisWeek:
+          type: integer
+        ayahsMemorizedLastWeek:
+          type: integer
+      required:
+        - studentId
+        - totalAyahsMemorized
+        - totalQuranPercentage
+        - juzCompleted
+        - successfulDaysPercent
+        - currentStreak
+        - thisMonthSuccessRate
+        - ayahsMemorizedThisMonth
+        - ayahsMemorizedThisWeek
+        - ayahsMemorizedLastWeek
+
+    CalendarDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum:
+            - successful
+            - partial
+            - failed
+            - absent
+      required:
+        - date
+        - status
+
+    CalendarData:
+      type: object
+      properties:
+        yearMonth:
+          type: string
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalendarDay"
+        successfulDays:
+          type: integer
+        totalAttendedDays:
+          type: integer
+        successRate:
+          type: number
+          format: float
+      required:
+        - yearMonth
+        - days
+        - successfulDays
+        - totalAttendedDays
+        - successRate
+
+    TodayStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - all_done
+            - in_progress
+            - not_started
+        completedTasks:
+          type: integer
+        totalTasks:
+          type: integer
+      required:
+        - status
+        - completedTasks
+        - totalTasks
+
+    DashboardStudent:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        currentSurah:
+          type: integer
+        currentAyah:
+          type: integer
+        todayStatus:
+          type: string
+          enum:
+            - all_done
+            - in_progress
+            - not_started
+        completedTasks:
+          type: integer
+      required:
+        - id
+        - name
+        - currentSurah
+        - currentAyah
+        - todayStatus
+        - completedTasks
+
+    ClassStats:
+      type: object
+      properties:
+        totalStudents:
+          type: integer
+        averageSuccessRate:
+          type: number
+          format: float
+        totalAyahsMemorized:
+          type: integer
+        topPerformers:
+          type: array
+          items:
+            $ref: "#/components/schemas/PerformerSummary"
+        needsAttention:
+          type: array
+          items:
+            $ref: "#/components/schemas/PerformerSummary"
+      required:
+        - totalStudents
+        - averageSuccessRate
+        - totalAyahsMemorized
+        - topPerformers
+        - needsAttention
+
+    PerformerSummary:
+      type: object
+      properties:
+        studentId:
+          type: integer
+        name:
+          type: string
+        successRate:
+          type: number
+          format: float
+      required:
+        - studentId
+        - name
+        - successRate
+
+    SurahInfo:
+      type: object
+      properties:
+        number:
+          type: integer
+        name:
+          type: string
+        nameArabic:
+          type: string
+        ayahCount:
+          type: integer
+        juz:
+          type: integer
+      required:
+        - number
+        - name
+        - nameArabic
+        - ayahCount
+        - juz
