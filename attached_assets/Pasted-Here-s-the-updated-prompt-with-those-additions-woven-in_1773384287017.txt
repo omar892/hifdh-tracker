@@ -1,0 +1,100 @@
+Here's the updated prompt with those additions woven in:
+
+Build a Quran Hifdh Tracker — Teacher Portal (iPad-optimized)
+I run a full-time hifdh (Quran memorization) program with 10+ students who attend 5 days a week, 5+ hours/day. I currently track everything on paper binders. I need a clean, mobile-friendly web app I can pull up on my iPad to replace that system.
+Core concept: Each student has 3 daily tasks — New Memorization, RMV (Recently Memorized Verses review), and Review (older material). All 3 must be completed for a "successful day." Sometimes students do extra review beyond the minimum.
+Tech stack:
+
+Frontend: React + Tailwind CSS
+Backend: Node.js/Express or Next.js API routes
+Database: PostgreSQL (use Replit's built-in DB or Neon)
+Auth: Simple teacher login (single user, password-protected)
+
+Data model:
+Students table:
+
+id, name, current_surah, current_ayah, start_date, notes, active (boolean)
+
+Daily Entries table:
+
+id, student_id, date
+new_memorization_from (surah:ayah), new_memorization_to (surah:ayah), new_memorization_completed (boolean)
+rmv_from (surah:ayah), rmv_to (surah:ayah), rmv_completed (boolean)
+review_from (surah:ayah), review_to (surah:ayah), review_completed (boolean)
+extra_review_from (surah:ayah), extra_review_to (surah:ayah) — optional
+grade/rating per category (e.g., Excellent / Good / Needs Repeat / Incomplete)
+teacher_notes (text)
+day_successful (auto-calculated: true only if all 3 core tasks are completed)
+
+Pages/Views:
+
+Dashboard (home screen):
+
+Today's date prominently displayed
+List of all active students as cards
+Each card shows: student name, green/yellow/red status for today (all done / in progress / not started), current position in Quran
+Tap a student card to open their daily entry
+
+
+Daily Entry form (per student):
+
+Pre-filled with student's current position
+3 sections: New Memorization, RMV, Review
+Each section has: range fields (from surah:ayah — to surah:ayah), completed checkbox, grade dropdown (Excellent / Good / Needs Repeat / Incomplete)
+Optional extra review section (can add multiple)
+Teacher notes text field
+"Day Complete" indicator auto-highlights green when all 3 are marked complete
+Save button, with ability to edit later in the day
+
+
+Student Profile page:
+KPI Summary Bar (top of profile, always visible):
+
+Total Memorized — displayed as juz + surah + ayah count (e.g., "4 Juz, 2 Surahs, 37 Ayahs") AND as a percentage of the full Quran (6,236 ayahs). Show a progress bar or radial gauge visualization alongside the number.
+Successful Days % — percentage of attended days where all 3 tasks were completed. Display as a large, bold number with a label like "Success Rate" and a color indicator (green ≥ 85%, yellow 70-84%, red < 70%).
+Current Streak — consecutive successful days (resets on an incomplete day or absence).
+This Month's Success Rate — same percentage but scoped to the current month only, so I can see trends vs the overall rate.
+Ayahs Memorized This Month — new memorization total for the current calendar month, so I can see pace at a glance.
+
+Monthly Calendar View:
+
+Full calendar grid for the current month, similar to a GitHub contribution graph or habit tracker
+Each day cell is color-coded: green = successful day (all 3 complete), yellow = partial (1-2 tasks done), red = attended but nothing completed, gray = absent or weekend/off day
+Tapping a day cell opens that day's entry for review or editing
+Month navigation arrows to go back to any previous month — I need to be able to reference September, October, etc. to see how a student was doing historically
+Small legend below the calendar explaining the color codes
+Monthly summary line below the calendar: "18/22 successful days (82%)" showing successful days out of total attended days for that month
+
+Additional Profile Info:
+
+Student info and start date
+Current position in the Quran
+Weekly/monthly stats: total new ayahs memorized this week vs last week (with trend arrow up/down)
+Scrollable history of past daily entries below the calendar
+
+
+Manage Students page:
+
+Add / edit / deactivate students
+Set their current surah and ayah position
+
+
+
+UX requirements:
+
+iPad-first design — large tap targets, no tiny buttons
+Works in landscape and portrait
+Quick entry: I need to log a student's work in under 30 seconds
+Surah names should be selectable from a dropdown (all 114 surahs) with ayah number as a number input
+Swipe or arrow buttons to quickly move between students on the daily entry page
+Dark mode toggle (I often use this in the masjid with low light)
+Persistent navigation bar at the bottom (mobile app style)
+KPI boxes should be large, readable from arm's length on an iPad — think dashboard-style cards with big numbers and small labels
+
+Nice to haves (implement if straightforward):
+
+Export weekly/monthly report as PDF or CSV (include the calendar view and KPIs in the export)
+Bulk "start new day" button that creates blank entries for all active students
+Running total of juz completed per student
+Simple Quran reference data: know how many ayahs are in each surah so the app can validate input and calculate progress as a percentage of the full Quran (total: 6,236 ayahs across 30 juz)
+Class-wide dashboard view: average success rate across all students, highest/lowest performers this month, total ayahs memorized across the program
