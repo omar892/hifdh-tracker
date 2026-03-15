@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
-import { useGetSession, useLogin, useLogout } from "@workspace/api-client-react";
+import { useGetSession, useLogin, useLogout, getGetSessionQueryKey } from "@workspace/api-client-react";
 
 export function useAuth() {
   const [, setLocation] = useLocation();
   const { data: session, isLoading, error, refetch } = useGetSession({
     query: {
+      queryKey: getGetSessionQueryKey(),
       retry: false,
       staleTime: 5 * 60 * 1000,
     }

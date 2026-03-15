@@ -247,7 +247,7 @@ router.get("/stats/class", requireAuth, async (req, res) => {
   });
 });
 
-router.get("/surahs", (req, res) => {
+router.get("/surahs", requireAuth, (req, res) => {
   res.json(SURAHS);
 });
 

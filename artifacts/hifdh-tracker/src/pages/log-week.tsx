@@ -6,6 +6,7 @@ import {
   useListStudents,
   useUpsertWeeklyEntry,
   useGetWeeklyEntry,
+  getGetWeeklyEntryQueryKey,
   useListSurahs,
 } from "@workspace/api-client-react";
 import { useParams, useLocation } from "wouter";
@@ -31,8 +32,8 @@ const WEEK_RATINGS = [
 const QUALITY_RATINGS = [
   { value: "excellent", label: "Excellent" },
   { value: "good", label: "Good" },
-  { value: "fair", label: "Fair" },
-  { value: "poor", label: "Poor" },
+  { value: "needs_repeat", label: "Needs Repeat" },
+  { value: "incomplete", label: "Incomplete" },
 ];
 
 function DaySelector({ label, value, max, onChange }: { label: string; value: number; max: number; onChange: (v: number) => void }) {
@@ -138,7 +139,7 @@ export default function LogWeek() {
   const { data: existingEntry } = useGetWeeklyEntry(
     student?.id ?? 0,
     weekStartStr,
-    { query: { enabled: !!student?.id, retry: false } }
+    { query: { queryKey: getGetWeeklyEntryQueryKey(student?.id ?? 0, weekStartStr), enabled: !!student?.id, retry: false } }
   );
 
   const [fromSurah, setFromSurah] = useState<number | null>(null);
@@ -201,8 +202,8 @@ export default function LogWeek() {
           successfulDays,
           daysAttended,
           weekRating: weekRating as "excellent" | "strong" | "steady" | "needs_improvement" | "difficult_week",
-          rmvQuality: rmvQuality as "excellent" | "good" | "fair" | "poor",
-          reviewQuality: reviewQuality as "excellent" | "good" | "fair" | "poor",
+          rmvQuality: rmvQuality as "excellent" | "good" | "needs_repeat" | "incomplete",
+          reviewQuality: reviewQuality as "excellent" | "good" | "needs_repeat" | "incomplete",
           teacherNotes: notes || null,
         },
       });
