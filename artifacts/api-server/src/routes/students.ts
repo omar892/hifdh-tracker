@@ -56,11 +56,17 @@ router.get("/students/:id", requireAuth, async (req, res) => {
 router.patch("/students/:id", requireAuth, async (req, res) => {
   const { id } = UpdateStudentParams.parse(req.params);
   const body = UpdateStudentBody.parse(req.body);
-  const updateData: Record<string, any> = {};
+  const updateData: Partial<{
+    name: string;
+    currentSurah: number;
+    currentAyah: number;
+    notes: string | null;
+    active: boolean;
+  }> = {};
   if (body.name !== undefined) updateData.name = body.name;
   if (body.currentSurah !== undefined) updateData.currentSurah = body.currentSurah;
   if (body.currentAyah !== undefined) updateData.currentAyah = body.currentAyah;
-  if (body.notes !== undefined) updateData.notes = body.notes;
+  if (body.notes !== undefined) updateData.notes = body.notes ?? null;
   if (body.active !== undefined) updateData.active = body.active;
 
   const [student] = await db.update(studentsTable).set(updateData).where(eq(studentsTable.id, id)).returning();

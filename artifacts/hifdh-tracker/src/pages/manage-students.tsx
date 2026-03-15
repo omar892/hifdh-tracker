@@ -24,13 +24,13 @@ function StudentForm({
   onSave: (data: StudentFormData) => void;
   onCancel: () => void;
   isSaving: boolean;
-  surahs: Array<{ number: number; totalAyahs: number }>;
+  surahs: Array<{ number: number; ayahCount: number }>;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [surah, setSurah] = useState<number | null>(initial?.surah ?? 1);
   const [ayah, setAyah] = useState(initial?.ayah ?? 1);
 
-  const maxAyah = surahs.find((s) => s.number === surah)?.totalAyahs ?? 286;
+  const maxAyah = surahs.find((s) => s.number === surah)?.ayahCount ?? 286;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

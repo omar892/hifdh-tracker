@@ -89,10 +89,10 @@ function AyahInput({ label, surah, ayah, onSurahChange, onAyahChange, surahs }: 
   ayah: number;
   onSurahChange: (v: number | null) => void;
   onAyahChange: (v: number) => void;
-  surahs: Array<{ number: number; totalAyahs: number; name: string }>;
+  surahs: Array<{ number: number; ayahCount: number; name: string }>;
 }) {
   const selectedSurah = surahs.find((s) => s.number === surah);
-  const maxAyah = selectedSurah?.totalAyahs ?? 286;
+  const maxAyah = selectedSurah?.ayahCount ?? 286;
 
   return (
     <div className="space-y-2">

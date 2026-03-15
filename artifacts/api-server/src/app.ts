@@ -19,7 +19,7 @@ const PgStore = pgSession(session);
 app.use(
   session({
     store: new PgStore({
-      pool: pool as any,
+      pool,
       tableName: "user_sessions",
       createTableIfMissing: true,
     }),

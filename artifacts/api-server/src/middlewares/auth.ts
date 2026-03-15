@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  if (req.session && (req.session as any).authenticated) {
+  if (req.session?.authenticated) {
     next();
   } else {
     res.status(401).json({ error: "Not authenticated" });

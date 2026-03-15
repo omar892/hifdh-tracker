@@ -3,12 +3,12 @@ import { LoginBody, LoginResponse, LogoutResponse, GetSessionResponse } from "@w
 
 const router: IRouter = Router();
 
-const TEACHER_PASSWORD = process.env.TEACHER_PASSWORD || "hifdh2024";
+const TEACHER_PASSWORD = process.env["TEACHER_PASSWORD"] ?? "hifdh2024";
 
 router.post("/auth/login", (req, res) => {
   const body = LoginBody.parse(req.body);
   if (body.password === TEACHER_PASSWORD) {
-    (req.session as any).authenticated = true;
+    req.session.authenticated = true;
     const data = LoginResponse.parse({ authenticated: true });
     res.json(data);
   } else {
@@ -29,7 +29,7 @@ router.post("/auth/logout", (req, res) => {
 });
 
 router.get("/auth/session", (req, res) => {
-  if (req.session && (req.session as any).authenticated) {
+  if (req.session?.authenticated) {
     const data = GetSessionResponse.parse({ authenticated: true });
     res.json(data);
   } else {
