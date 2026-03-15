@@ -1,46 +1,62 @@
 import { Router, type IRouter } from "express";
-import { db, dailyEntriesTable } from "@workspace/db";
+import { db, weeklyEntriesTable, studentsTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import {
-  ListEntriesParams,
-  ListEntriesQueryParams,
-  GetEntryParams,
-  UpsertEntryParams,
-  UpsertEntryBody,
+  ListWeeklyEntriesParams,
+  ListWeeklyEntriesQueryParams,
+  GetWeeklyEntryParams,
+  UpsertWeeklyEntryParams,
+  UpsertWeeklyEntryBody,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
+import { calculateAyahsBetween } from "../lib/quran-data";
 
 const router: IRouter = Router();
 
-router.get("/students/:studentId/entries", requireAuth, async (req, res) => {
-  const { studentId } = ListEntriesParams.parse(req.params);
-  const query = ListEntriesQueryParams.parse(req.query);
+function getMondayOfWeek(dateStr: string): string {
+  const d = new Date(dateStr);
+  const day = d.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setUTCDate(d.getUTCDate() + diff);
+  return d.toISOString().split("T")[0];
+}
 
-  let conditions = [eq(dailyEntriesTable.studentId, studentId)];
+function getFridayOfWeek(mondayStr: string): string {
+  const d = new Date(mondayStr);
+  d.setUTCDate(d.getUTCDate() + 4);
+  return d.toISOString().split("T")[0];
+}
 
-  const entries = await db
+router.get("/students/:studentId/entries/weekly", requireAuth, async (req, res) => {
+  const { studentId } = ListWeeklyEntriesParams.parse(req.params);
+  const query = ListWeeklyEntriesQueryParams.parse(req.query);
+
+  let entries = await db
     .select()
-    .from(dailyEntriesTable)
-    .where(and(...conditions))
-    .orderBy(desc(dailyEntriesTable.date))
-    .limit(query.limit ?? 50)
+    .from(weeklyEntriesTable)
+    .where(eq(weeklyEntriesTable.studentId, studentId))
+    .orderBy(desc(weeklyEntriesTable.weekStartDate))
+    .limit(query.limit ?? 52)
     .offset(query.offset ?? 0);
 
   if (query.month) {
-    const filtered = entries.filter((e) => e.date.startsWith(query.month!));
-    res.json(filtered);
-    return;
+    entries = entries.filter((e) => e.weekStartDate.startsWith(query.month!));
   }
 
   res.json(entries);
 });
 
-router.get("/students/:studentId/entries/:date", requireAuth, async (req, res) => {
-  const { studentId, date } = GetEntryParams.parse(req.params);
+router.get("/students/:studentId/entries/weekly/:weekStart", requireAuth, async (req, res) => {
+  const { studentId, weekStart } = GetWeeklyEntryParams.parse(req.params);
   const [entry] = await db
     .select()
-    .from(dailyEntriesTable)
-    .where(and(eq(dailyEntriesTable.studentId, studentId), eq(dailyEntriesTable.date, date)));
+    .from(weeklyEntriesTable)
+    .where(
+      and(
+        eq(weeklyEntriesTable.studentId, studentId),
+        eq(weeklyEntriesTable.weekStartDate, weekStart)
+      )
+    );
 
   if (!entry) {
     res.status(404).json({ error: "Entry not found" });
@@ -49,55 +65,79 @@ router.get("/students/:studentId/entries/:date", requireAuth, async (req, res) =
   res.json(entry);
 });
 
-router.put("/students/:studentId/entries/:date", requireAuth, async (req, res) => {
-  const { studentId, date } = UpsertEntryParams.parse(req.params);
-  const body = UpsertEntryBody.parse(req.body);
+router.put("/students/:studentId/entries/weekly/:weekStart", requireAuth, async (req, res) => {
+  const { studentId, weekStart } = UpsertWeeklyEntryParams.parse(req.params);
+  const body = UpsertWeeklyEntryBody.parse(req.body);
 
-  const daySuccessful = body.newMemorizationCompleted && body.rmvCompleted && body.reviewCompleted;
+  const mondayDate = getMondayOfWeek(weekStart);
+  const fridayDate = getFridayOfWeek(mondayDate);
+
+  let ayahsMemorized = 0;
+  if (
+    body.newMemFromSurah != null &&
+    body.newMemFromAyah != null &&
+    body.newMemToSurah != null &&
+    body.newMemToAyah != null
+  ) {
+    ayahsMemorized = calculateAyahsBetween(
+      body.newMemFromSurah,
+      body.newMemFromAyah,
+      body.newMemToSurah,
+      body.newMemToAyah
+    );
+  }
 
   const entryData = {
     studentId,
-    date,
-    newMemorizationFromSurah: body.newMemorizationFromSurah ?? null,
-    newMemorizationFromAyah: body.newMemorizationFromAyah ?? null,
-    newMemorizationToSurah: body.newMemorizationToSurah ?? null,
-    newMemorizationToAyah: body.newMemorizationToAyah ?? null,
-    newMemorizationCompleted: body.newMemorizationCompleted,
-    newMemorizationGrade: body.newMemorizationGrade ?? null,
-    rmvFromSurah: body.rmvFromSurah ?? null,
-    rmvFromAyah: body.rmvFromAyah ?? null,
-    rmvToSurah: body.rmvToSurah ?? null,
-    rmvToAyah: body.rmvToAyah ?? null,
-    rmvCompleted: body.rmvCompleted,
-    rmvGrade: body.rmvGrade ?? null,
-    reviewFromSurah: body.reviewFromSurah ?? null,
-    reviewFromAyah: body.reviewFromAyah ?? null,
-    reviewToSurah: body.reviewToSurah ?? null,
-    reviewToAyah: body.reviewToAyah ?? null,
-    reviewCompleted: body.reviewCompleted,
-    reviewGrade: body.reviewGrade ?? null,
-    extraReviewFromSurah: body.extraReviewFromSurah ?? null,
-    extraReviewFromAyah: body.extraReviewFromAyah ?? null,
-    extraReviewToSurah: body.extraReviewToSurah ?? null,
-    extraReviewToAyah: body.extraReviewToAyah ?? null,
+    weekStartDate: mondayDate,
+    weekEndDate: fridayDate,
+    newMemFromSurah: body.newMemFromSurah ?? null,
+    newMemFromAyah: body.newMemFromAyah ?? null,
+    newMemToSurah: body.newMemToSurah ?? null,
+    newMemToAyah: body.newMemToAyah ?? null,
+    ayahsMemorized,
+    successfulDays: body.successfulDays,
+    daysAttended: body.daysAttended,
+    weekRating: body.weekRating ?? null,
+    rmvQuality: body.rmvQuality ?? null,
+    reviewQuality: body.reviewQuality ?? null,
     teacherNotes: body.teacherNotes ?? null,
-    daySuccessful,
+    updatedAt: new Date(),
   };
 
   const [existing] = await db
     .select()
-    .from(dailyEntriesTable)
-    .where(and(eq(dailyEntriesTable.studentId, studentId), eq(dailyEntriesTable.date, date)));
+    .from(weeklyEntriesTable)
+    .where(
+      and(
+        eq(weeklyEntriesTable.studentId, studentId),
+        eq(weeklyEntriesTable.weekStartDate, mondayDate)
+      )
+    );
 
   let entry;
   if (existing) {
     [entry] = await db
-      .update(dailyEntriesTable)
+      .update(weeklyEntriesTable)
       .set(entryData)
-      .where(eq(dailyEntriesTable.id, existing.id))
+      .where(eq(weeklyEntriesTable.id, existing.id))
       .returning();
   } else {
-    [entry] = await db.insert(dailyEntriesTable).values(entryData).returning();
+    [entry] = await db.insert(weeklyEntriesTable).values(entryData).returning();
+  }
+
+  if (
+    body.newMemToSurah != null &&
+    body.newMemToAyah != null &&
+    ayahsMemorized > 0
+  ) {
+    await db
+      .update(studentsTable)
+      .set({
+        currentSurah: body.newMemToSurah,
+        currentAyah: body.newMemToAyah,
+      })
+      .where(eq(studentsTable.id, studentId));
   }
 
   res.json(entry);

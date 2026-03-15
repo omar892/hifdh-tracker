@@ -3,30 +3,28 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export * from "./authResponse";
-export * from "./calendarData";
-export * from "./calendarDay";
-export * from "./calendarDayStatus";
+export * from "./calendarWeek";
 export * from "./classStats";
 export * from "./createStudentRequest";
-export * from "./dailyEntry";
 export * from "./dashboardStudent";
-export * from "./dashboardStudentTodayStatus";
 export * from "./errorResponse";
-export * from "./grade";
+export * from "./getStudentCalendarParams";
 export * from "./healthStatus";
-export * from "./listEntriesParams";
 export * from "./listStudentsParams";
+export * from "./listWeeklyEntriesParams";
 export * from "./loginRequest";
 export * from "./messageResponse";
-export * from "./performerSummary";
+export * from "./quality";
 export * from "./student";
+export * from "./studentCalendar";
+export * from "./studentPerformance";
 export * from "./studentStats";
-export * from "./surahInfo";
-export * from "./todayStatus";
-export * from "./todayStatusStatus";
+export * from "./surah";
 export * from "./updateStudentRequest";
-export * from "./upsertEntryRequest";
+export * from "./upsertWeeklyEntryRequest";
+export * from "./weeklyEntry";
+export * from "./weekRating";

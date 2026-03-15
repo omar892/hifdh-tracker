@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
+  version: 0.2.0
   description: Quran Hifdh Tracker API
 servers:
   - url: /api
@@ -15,9 +15,10 @@ tags:
   - name: students
     description: Student management
   - name: entries
-    description: Daily entry management
+    description: Weekly entry management
   - name: stats
     description: Statistics and KPIs
+
 paths:
   /healthz:
     get:
@@ -77,7 +78,7 @@ paths:
       summary: Get current session
       responses:
         "200":
-          description: Session info
+          description: Authenticated
           content:
             application/json:
               schema:
@@ -99,7 +100,6 @@ paths:
           in: query
           schema:
             type: boolean
-          description: Filter by active status
       responses:
         "200":
           description: List of students
@@ -112,7 +112,7 @@ paths:
     post:
       operationId: createStudent
       tags: [students]
-      summary: Create a new student
+      summary: Create a student
       requestBody:
         required: true
         content:
@@ -121,7 +121,7 @@ paths:
               $ref: "#/components/schemas/CreateStudentRequest"
       responses:
         "201":
-          description: Student created
+          description: Created
           content:
             application/json:
               schema:
@@ -140,7 +140,7 @@ paths:
             type: integer
       responses:
         "200":
-          description: Student details
+          description: Student
           content:
             application/json:
               schema:
@@ -169,17 +169,17 @@ paths:
               $ref: "#/components/schemas/UpdateStudentRequest"
       responses:
         "200":
-          description: Student updated
+          description: Updated student
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Student"
 
-  /students/{studentId}/entries:
+  /students/{studentId}/entries/weekly:
     get:
-      operationId: listEntries
+      operationId: listWeeklyEntries
       tags: [entries]
-      summary: List daily entries for a student
+      summary: List weekly entries for a student
       parameters:
         - name: studentId
           in: path
@@ -188,14 +188,14 @@ paths:
             type: integer
         - name: month
           in: query
+          description: "Filter by month (YYYY-MM)"
           schema:
             type: string
-          description: "Filter by month (YYYY-MM format)"
         - name: limit
           in: query
           schema:
             type: integer
-            default: 50
+            default: 52
         - name: offset
           in: query
           schema:
@@ -203,38 +203,38 @@ paths:
             default: 0
       responses:
         "200":
-          description: List of entries
+          description: Weekly entries
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/DailyEntry"
+                  $ref: "#/components/schemas/WeeklyEntry"
 
-  /students/{studentId}/entries/{date}:
+  /students/{studentId}/entries/weekly/{weekStart}:
     get:
-      operationId: getEntry
+      operationId: getWeeklyEntry
       tags: [entries]
-      summary: Get entry for a specific date
+      summary: Get a specific weekly entry
       parameters:
         - name: studentId
           in: path
           required: true
           schema:
             type: integer
-        - name: date
+        - name: weekStart
           in: path
           required: true
+          description: "Monday date (YYYY-MM-DD)"
           schema:
             type: string
-            format: date
       responses:
         "200":
-          description: Daily entry
+          description: Weekly entry
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DailyEntry"
+                $ref: "#/components/schemas/WeeklyEntry"
         "404":
           description: Not found
           content:
@@ -242,40 +242,40 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
     put:
-      operationId: upsertEntry
+      operationId: upsertWeeklyEntry
       tags: [entries]
-      summary: Create or update entry for a date
+      summary: Create or update a weekly entry
       parameters:
         - name: studentId
           in: path
           required: true
           schema:
             type: integer
-        - name: date
+        - name: weekStart
           in: path
           required: true
+          description: "Monday date (YYYY-MM-DD)"
           schema:
             type: string
-            format: date
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpsertEntryRequest"
+              $ref: "#/components/schemas/UpsertWeeklyEntryRequest"
       responses:
         "200":
-          description: Entry saved
+          description: Upserted weekly entry
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DailyEntry"
+                $ref: "#/components/schemas/WeeklyEntry"
 
   /students/{studentId}/stats:
     get:
       operationId: getStudentStats
       tags: [stats]
-      summary: Get student KPIs
+      summary: Get KPI stats for a student
       parameters:
         - name: studentId
           in: path
@@ -284,13 +284,13 @@ paths:
             type: integer
       responses:
         "200":
-          description: Student statistics
+          description: Student stats
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/StudentStats"
 
-  /students/{studentId}/calendar/{yearMonth}:
+  /students/{studentId}/calendar:
     get:
       operationId: getStudentCalendar
       tags: [stats]
@@ -301,60 +301,28 @@ paths:
           required: true
           schema:
             type: integer
-        - name: yearMonth
-          in: path
+        - name: month
+          in: query
           required: true
+          description: "Month to fetch (YYYY-MM)"
           schema:
             type: string
-          description: "YYYY-MM format"
       responses:
         "200":
           description: Calendar data
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CalendarData"
-
-  /stats/class:
-    get:
-      operationId: getClassStats
-      tags: [stats]
-      summary: Get class-wide statistics
-      responses:
-        "200":
-          description: Class statistics
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ClassStats"
-
-  /students/{studentId}/today-status:
-    get:
-      operationId: getStudentTodayStatus
-      tags: [entries]
-      summary: Get today's completion status for a student
-      parameters:
-        - name: studentId
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: Today status
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TodayStatus"
+                $ref: "#/components/schemas/StudentCalendar"
 
   /dashboard:
     get:
       operationId: getDashboard
       tags: [stats]
-      summary: Get dashboard data with all students and today status
+      summary: Get dashboard data for all active students
       responses:
         "200":
-          description: Dashboard data
+          description: Dashboard student list
           content:
             application/json:
               schema:
@@ -362,65 +330,74 @@ paths:
                 items:
                   $ref: "#/components/schemas/DashboardStudent"
 
+  /stats/class:
+    get:
+      operationId: getClassStats
+      tags: [stats]
+      summary: Class-wide statistics
+      responses:
+        "200":
+          description: Class stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClassStats"
+
   /surahs:
     get:
       operationId: listSurahs
-      tags: [health]
-      summary: List all 114 surahs with ayah counts
+      tags: [stats]
+      summary: List all 114 surahs
       responses:
         "200":
-          description: List of surahs
+          description: Surah list
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/SurahInfo"
+                  $ref: "#/components/schemas/Surah"
 
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
     ErrorResponse:
       type: object
+      required: [error]
       properties:
         error:
           type: string
-      required:
-        - error
 
     MessageResponse:
       type: object
+      required: [message]
       properties:
         message:
           type: string
-      required:
-        - message
 
     LoginRequest:
       type: object
+      required: [password]
       properties:
         password:
           type: string
-      required:
-        - password
 
     AuthResponse:
       type: object
+      required: [authenticated]
       properties:
         authenticated:
           type: boolean
-      required:
-        - authenticated
 
     Student:
       type: object
+      required: [id, name, currentSurah, currentAyah, startDate, active, createdAt]
       properties:
         id:
           type: integer
@@ -432,7 +409,6 @@ components:
           type: integer
         startDate:
           type: string
-          format: date
         notes:
           type: string
           nullable: true
@@ -440,18 +416,10 @@ components:
           type: boolean
         createdAt:
           type: string
-          format: date-time
-      required:
-        - id
-        - name
-        - currentSurah
-        - currentAyah
-        - startDate
-        - active
-        - createdAt
 
     CreateStudentRequest:
       type: object
+      required: [name, currentSurah, currentAyah, startDate]
       properties:
         name:
           type: string
@@ -461,15 +429,9 @@ components:
           type: integer
         startDate:
           type: string
-          format: date
         notes:
           type: string
           nullable: true
-      required:
-        - name
-        - currentSurah
-        - currentAyah
-        - startDate
 
     UpdateStudentRequest:
       type: object
@@ -480,283 +442,168 @@ components:
           type: integer
         currentAyah:
           type: integer
+        startDate:
+          type: string
         notes:
           type: string
           nullable: true
         active:
           type: boolean
 
-    Grade:
+    WeekRating:
       type: string
-      enum:
-        - excellent
-        - good
-        - needs_repeat
-        - incomplete
+      enum: [excellent, strong, steady, needs_improvement, difficult_week]
 
-    DailyEntry:
+    Quality:
+      type: string
+      enum: [excellent, good, needs_repeat, incomplete]
+
+    WeeklyEntry:
       type: object
+      required: [id, studentId, weekStartDate, weekEndDate, ayahsMemorized, successfulDays, daysAttended, createdAt, updatedAt]
       properties:
         id:
           type: integer
         studentId:
           type: integer
-        date:
+        weekStartDate:
           type: string
-          format: date
-        newMemorizationFromSurah:
+        weekEndDate:
+          type: string
+        newMemFromSurah:
           type: integer
           nullable: true
-        newMemorizationFromAyah:
+        newMemFromAyah:
           type: integer
           nullable: true
-        newMemorizationToSurah:
+        newMemToSurah:
           type: integer
           nullable: true
-        newMemorizationToAyah:
+        newMemToAyah:
           type: integer
           nullable: true
-        newMemorizationCompleted:
-          type: boolean
-        newMemorizationGrade:
-          $ref: "#/components/schemas/Grade"
-          nullable: true
-        rmvFromSurah:
+        ayahsMemorized:
           type: integer
-          nullable: true
-        rmvFromAyah:
+        successfulDays:
           type: integer
-          nullable: true
-        rmvToSurah:
+        daysAttended:
           type: integer
+        weekRating:
+          $ref: "#/components/schemas/WeekRating"
           nullable: true
-        rmvToAyah:
-          type: integer
+        rmvQuality:
+          $ref: "#/components/schemas/Quality"
           nullable: true
-        rmvCompleted:
-          type: boolean
-        rmvGrade:
-          $ref: "#/components/schemas/Grade"
-          nullable: true
-        reviewFromSurah:
-          type: integer
-          nullable: true
-        reviewFromAyah:
-          type: integer
-          nullable: true
-        reviewToSurah:
-          type: integer
-          nullable: true
-        reviewToAyah:
-          type: integer
-          nullable: true
-        reviewCompleted:
-          type: boolean
-        reviewGrade:
-          $ref: "#/components/schemas/Grade"
-          nullable: true
-        extraReviewFromSurah:
-          type: integer
-          nullable: true
-        extraReviewFromAyah:
-          type: integer
-          nullable: true
-        extraReviewToSurah:
-          type: integer
-          nullable: true
-        extraReviewToAyah:
-          type: integer
+        reviewQuality:
+          $ref: "#/components/schemas/Quality"
           nullable: true
         teacherNotes:
           type: string
           nullable: true
-        daySuccessful:
-          type: boolean
         createdAt:
           type: string
-          format: date-time
-      required:
-        - id
-        - studentId
-        - date
-        - newMemorizationCompleted
-        - rmvCompleted
-        - reviewCompleted
-        - daySuccessful
-        - createdAt
+        updatedAt:
+          type: string
 
-    UpsertEntryRequest:
+    UpsertWeeklyEntryRequest:
       type: object
+      required: [successfulDays, daysAttended]
       properties:
-        newMemorizationFromSurah:
+        newMemFromSurah:
           type: integer
           nullable: true
-        newMemorizationFromAyah:
+        newMemFromAyah:
           type: integer
           nullable: true
-        newMemorizationToSurah:
+        newMemToSurah:
           type: integer
           nullable: true
-        newMemorizationToAyah:
+        newMemToAyah:
           type: integer
           nullable: true
-        newMemorizationCompleted:
-          type: boolean
-        newMemorizationGrade:
-          $ref: "#/components/schemas/Grade"
-          nullable: true
-        rmvFromSurah:
+        successfulDays:
           type: integer
-          nullable: true
-        rmvFromAyah:
+          minimum: 0
+          maximum: 5
+        daysAttended:
           type: integer
+          minimum: 0
+          maximum: 5
+        weekRating:
+          $ref: "#/components/schemas/WeekRating"
           nullable: true
-        rmvToSurah:
-          type: integer
+        rmvQuality:
+          $ref: "#/components/schemas/Quality"
           nullable: true
-        rmvToAyah:
-          type: integer
-          nullable: true
-        rmvCompleted:
-          type: boolean
-        rmvGrade:
-          $ref: "#/components/schemas/Grade"
-          nullable: true
-        reviewFromSurah:
-          type: integer
-          nullable: true
-        reviewFromAyah:
-          type: integer
-          nullable: true
-        reviewToSurah:
-          type: integer
-          nullable: true
-        reviewToAyah:
-          type: integer
-          nullable: true
-        reviewCompleted:
-          type: boolean
-        reviewGrade:
-          $ref: "#/components/schemas/Grade"
-          nullable: true
-        extraReviewFromSurah:
-          type: integer
-          nullable: true
-        extraReviewFromAyah:
-          type: integer
-          nullable: true
-        extraReviewToSurah:
-          type: integer
-          nullable: true
-        extraReviewToAyah:
-          type: integer
+        reviewQuality:
+          $ref: "#/components/schemas/Quality"
           nullable: true
         teacherNotes:
           type: string
           nullable: true
-      required:
-        - newMemorizationCompleted
-        - rmvCompleted
-        - reviewCompleted
 
     StudentStats:
       type: object
+      required: [totalAyahsMemorized, totalQuranPercentage, juzCompleted, overallSuccessRate, currentStreakWeeks, ayahsThisMonth, ayahsLastMonth]
       properties:
-        studentId:
-          type: integer
         totalAyahsMemorized:
           type: integer
         totalQuranPercentage:
           type: number
-          format: float
         juzCompleted:
-          type: integer
-        successfulDaysPercent:
           type: number
-          format: float
-        currentStreak:
-          type: integer
-        thisMonthSuccessRate:
+        overallSuccessRate:
           type: number
-          format: float
-        ayahsMemorizedThisMonth:
+        currentStreakWeeks:
           type: integer
-        ayahsMemorizedThisWeek:
+        ayahsThisMonth:
           type: integer
-        ayahsMemorizedLastWeek:
+        ayahsLastMonth:
           type: integer
-      required:
-        - studentId
-        - totalAyahsMemorized
-        - totalQuranPercentage
-        - juzCompleted
-        - successfulDaysPercent
-        - currentStreak
-        - thisMonthSuccessRate
-        - ayahsMemorizedThisMonth
-        - ayahsMemorizedThisWeek
-        - ayahsMemorizedLastWeek
 
-    CalendarDay:
+    CalendarWeek:
       type: object
+      required: [weekStartDate, weekEndDate, hasEntry]
       properties:
-        date:
+        weekStartDate:
           type: string
-          format: date
-        status:
+        weekEndDate:
           type: string
-          enum:
-            - successful
-            - partial
-            - failed
-            - absent
-      required:
-        - date
-        - status
-
-    CalendarData:
-      type: object
-      properties:
-        yearMonth:
-          type: string
-        days:
-          type: array
-          items:
-            $ref: "#/components/schemas/CalendarDay"
+        weekRating:
+          $ref: "#/components/schemas/WeekRating"
+          nullable: true
         successfulDays:
           type: integer
-        totalAttendedDays:
+          nullable: true
+        daysAttended:
           type: integer
-        successRate:
-          type: number
-          format: float
-      required:
-        - yearMonth
-        - days
-        - successfulDays
-        - totalAttendedDays
-        - successRate
+          nullable: true
+        ayahsMemorized:
+          type: integer
+          nullable: true
+        hasEntry:
+          type: boolean
 
-    TodayStatus:
+    StudentCalendar:
       type: object
+      required: [month, weeks, totalAyahs, avgSuccessfulDays, excellentWeeks]
       properties:
-        status:
+        month:
           type: string
-          enum:
-            - all_done
-            - in_progress
-            - not_started
-        completedTasks:
+        weeks:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalendarWeek"
+        totalAyahs:
           type: integer
-        totalTasks:
+        avgSuccessfulDays:
+          type: number
+        excellentWeeks:
           type: integer
-      required:
-        - status
-        - completedTasks
-        - totalTasks
 
     DashboardStudent:
       type: object
+      required: [id, name, currentSurah, currentAyah, active, thisWeekDone]
       properties:
         id:
           type: integer
@@ -766,49 +613,38 @@ components:
           type: integer
         currentAyah:
           type: integer
-        todayStatus:
-          type: string
-          enum:
-            - all_done
-            - in_progress
-            - not_started
-        completedTasks:
-          type: integer
-      required:
-        - id
-        - name
-        - currentSurah
-        - currentAyah
-        - todayStatus
-        - completedTasks
+        active:
+          type: boolean
+        thisWeekDone:
+          type: boolean
+        thisWeekEntry:
+          $ref: "#/components/schemas/WeeklyEntry"
+          nullable: true
 
     ClassStats:
       type: object
+      required: [totalStudents, averageSuccessRate, totalAyahsMemorized, avgAyahsPerWeek, topPerformers, needsAttention]
       properties:
         totalStudents:
           type: integer
         averageSuccessRate:
           type: number
-          format: float
         totalAyahsMemorized:
           type: integer
+        avgAyahsPerWeek:
+          type: number
         topPerformers:
           type: array
           items:
-            $ref: "#/components/schemas/PerformerSummary"
+            $ref: "#/components/schemas/StudentPerformance"
         needsAttention:
           type: array
           items:
-            $ref: "#/components/schemas/PerformerSummary"
-      required:
-        - totalStudents
-        - averageSuccessRate
-        - totalAyahsMemorized
-        - topPerformers
-        - needsAttention
+            $ref: "#/components/schemas/StudentPerformance"
 
-    PerformerSummary:
+    StudentPerformance:
       type: object
+      required: [studentId, name, successRate]
       properties:
         studentId:
           type: integer
@@ -816,14 +652,10 @@ components:
           type: string
         successRate:
           type: number
-          format: float
-      required:
-        - studentId
-        - name
-        - successRate
 
-    SurahInfo:
+    Surah:
       type: object
+      required: [number, name, nameArabic, ayahCount, juz]
       properties:
         number:
           type: integer
@@ -835,9 +667,3 @@ components:
           type: integer
         juz:
           type: integer
-      required:
-        - number
-        - name
-        - nameArabic
-        - ayahCount
-        - juz

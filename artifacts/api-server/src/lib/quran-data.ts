@@ -178,3 +178,14 @@ export function calculateJuzFromPosition(surah: number, ayah: number): number {
   }
   return juz;
 }
+
+export function calculateAyahsBetween(
+  fromSurah: number,
+  fromAyah: number,
+  toSurah: number,
+  toAyah: number
+): number {
+  const from = calculateAyahsUpTo(fromSurah, fromAyah);
+  const to = calculateAyahsUpTo(toSurah, toAyah);
+  return Math.max(0, to - from + 1);
+}

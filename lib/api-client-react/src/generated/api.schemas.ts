@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 export interface HealthStatus {
   status: string;
@@ -48,146 +48,110 @@ export interface UpdateStudentRequest {
   name?: string;
   currentSurah?: number;
   currentAyah?: number;
+  startDate?: string;
   notes?: string | null;
   active?: boolean;
 }
 
-export type Grade = (typeof Grade)[keyof typeof Grade];
+export type WeekRating = (typeof WeekRating)[keyof typeof WeekRating];
 
-export const Grade = {
+export const WeekRating = {
+  excellent: "excellent",
+  strong: "strong",
+  steady: "steady",
+  needs_improvement: "needs_improvement",
+  difficult_week: "difficult_week",
+} as const;
+
+export type Quality = (typeof Quality)[keyof typeof Quality];
+
+export const Quality = {
   excellent: "excellent",
   good: "good",
   needs_repeat: "needs_repeat",
   incomplete: "incomplete",
 } as const;
 
-export interface DailyEntry {
+export interface WeeklyEntry {
   id: number;
   studentId: number;
-  date: string;
-  newMemorizationFromSurah?: number | null;
-  newMemorizationFromAyah?: number | null;
-  newMemorizationToSurah?: number | null;
-  newMemorizationToAyah?: number | null;
-  newMemorizationCompleted: boolean;
-  newMemorizationGrade?: Grade | null;
-  rmvFromSurah?: number | null;
-  rmvFromAyah?: number | null;
-  rmvToSurah?: number | null;
-  rmvToAyah?: number | null;
-  rmvCompleted: boolean;
-  rmvGrade?: Grade | null;
-  reviewFromSurah?: number | null;
-  reviewFromAyah?: number | null;
-  reviewToSurah?: number | null;
-  reviewToAyah?: number | null;
-  reviewCompleted: boolean;
-  reviewGrade?: Grade | null;
-  extraReviewFromSurah?: number | null;
-  extraReviewFromAyah?: number | null;
-  extraReviewToSurah?: number | null;
-  extraReviewToAyah?: number | null;
+  weekStartDate: string;
+  weekEndDate: string;
+  newMemFromSurah?: number | null;
+  newMemFromAyah?: number | null;
+  newMemToSurah?: number | null;
+  newMemToAyah?: number | null;
+  ayahsMemorized: number;
+  successfulDays: number;
+  daysAttended: number;
+  weekRating?: WeekRating | null;
+  rmvQuality?: Quality | null;
+  reviewQuality?: Quality | null;
   teacherNotes?: string | null;
-  daySuccessful: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
-export interface UpsertEntryRequest {
-  newMemorizationFromSurah?: number | null;
-  newMemorizationFromAyah?: number | null;
-  newMemorizationToSurah?: number | null;
-  newMemorizationToAyah?: number | null;
-  newMemorizationCompleted: boolean;
-  newMemorizationGrade?: Grade | null;
-  rmvFromSurah?: number | null;
-  rmvFromAyah?: number | null;
-  rmvToSurah?: number | null;
-  rmvToAyah?: number | null;
-  rmvCompleted: boolean;
-  rmvGrade?: Grade | null;
-  reviewFromSurah?: number | null;
-  reviewFromAyah?: number | null;
-  reviewToSurah?: number | null;
-  reviewToAyah?: number | null;
-  reviewCompleted: boolean;
-  reviewGrade?: Grade | null;
-  extraReviewFromSurah?: number | null;
-  extraReviewFromAyah?: number | null;
-  extraReviewToSurah?: number | null;
-  extraReviewToAyah?: number | null;
+export interface UpsertWeeklyEntryRequest {
+  newMemFromSurah?: number | null;
+  newMemFromAyah?: number | null;
+  newMemToSurah?: number | null;
+  newMemToAyah?: number | null;
+  /**
+   * @minimum 0
+   * @maximum 5
+   */
+  successfulDays: number;
+  /**
+   * @minimum 0
+   * @maximum 5
+   */
+  daysAttended: number;
+  weekRating?: WeekRating | null;
+  rmvQuality?: Quality | null;
+  reviewQuality?: Quality | null;
   teacherNotes?: string | null;
 }
 
 export interface StudentStats {
-  studentId: number;
   totalAyahsMemorized: number;
   totalQuranPercentage: number;
   juzCompleted: number;
-  successfulDaysPercent: number;
-  currentStreak: number;
-  thisMonthSuccessRate: number;
-  ayahsMemorizedThisMonth: number;
-  ayahsMemorizedThisWeek: number;
-  ayahsMemorizedLastWeek: number;
+  overallSuccessRate: number;
+  currentStreakWeeks: number;
+  ayahsThisMonth: number;
+  ayahsLastMonth: number;
 }
 
-export type CalendarDayStatus =
-  (typeof CalendarDayStatus)[keyof typeof CalendarDayStatus];
-
-export const CalendarDayStatus = {
-  successful: "successful",
-  partial: "partial",
-  failed: "failed",
-  absent: "absent",
-} as const;
-
-export interface CalendarDay {
-  date: string;
-  status: CalendarDayStatus;
+export interface CalendarWeek {
+  weekStartDate: string;
+  weekEndDate: string;
+  weekRating?: WeekRating | null;
+  successfulDays?: number | null;
+  daysAttended?: number | null;
+  ayahsMemorized?: number | null;
+  hasEntry: boolean;
 }
 
-export interface CalendarData {
-  yearMonth: string;
-  days: CalendarDay[];
-  successfulDays: number;
-  totalAttendedDays: number;
-  successRate: number;
+export interface StudentCalendar {
+  month: string;
+  weeks: CalendarWeek[];
+  totalAyahs: number;
+  avgSuccessfulDays: number;
+  excellentWeeks: number;
 }
-
-export type TodayStatusStatus =
-  (typeof TodayStatusStatus)[keyof typeof TodayStatusStatus];
-
-export const TodayStatusStatus = {
-  all_done: "all_done",
-  in_progress: "in_progress",
-  not_started: "not_started",
-} as const;
-
-export interface TodayStatus {
-  status: TodayStatusStatus;
-  completedTasks: number;
-  totalTasks: number;
-}
-
-export type DashboardStudentTodayStatus =
-  (typeof DashboardStudentTodayStatus)[keyof typeof DashboardStudentTodayStatus];
-
-export const DashboardStudentTodayStatus = {
-  all_done: "all_done",
-  in_progress: "in_progress",
-  not_started: "not_started",
-} as const;
 
 export interface DashboardStudent {
   id: number;
   name: string;
   currentSurah: number;
   currentAyah: number;
-  todayStatus: DashboardStudentTodayStatus;
-  completedTasks: number;
+  active: boolean;
+  thisWeekDone: boolean;
+  thisWeekEntry?: WeeklyEntry | null;
 }
 
-export interface PerformerSummary {
+export interface StudentPerformance {
   studentId: number;
   name: string;
   successRate: number;
@@ -197,11 +161,12 @@ export interface ClassStats {
   totalStudents: number;
   averageSuccessRate: number;
   totalAyahsMemorized: number;
-  topPerformers: PerformerSummary[];
-  needsAttention: PerformerSummary[];
+  avgAyahsPerWeek: number;
+  topPerformers: StudentPerformance[];
+  needsAttention: StudentPerformance[];
 }
 
-export interface SurahInfo {
+export interface Surah {
   number: number;
   name: string;
   nameArabic: string;
@@ -210,17 +175,21 @@ export interface SurahInfo {
 }
 
 export type ListStudentsParams = {
-  /**
-   * Filter by active status
-   */
   active?: boolean;
 };
 
-export type ListEntriesParams = {
+export type ListWeeklyEntriesParams = {
   /**
-   * Filter by month (YYYY-MM format)
+   * Filter by month (YYYY-MM)
    */
   month?: string;
   limit?: number;
   offset?: number;
+};
+
+export type GetStudentCalendarParams = {
+  /**
+   * Month to fetch (YYYY-MM)
+   */
+  month: string;
 };

@@ -3,15 +3,16 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
-import type { DashboardStudentTodayStatus } from "./dashboardStudentTodayStatus";
+import type { WeeklyEntry } from "./weeklyEntry";
 
 export interface DashboardStudent {
   id: number;
   name: string;
   currentSurah: number;
   currentAyah: number;
-  todayStatus: DashboardStudentTodayStatus;
-  completedTasks: number;
+  active: boolean;
+  thisWeekDone: boolean;
+  thisWeekEntry?: WeeklyEntry | null;
 }

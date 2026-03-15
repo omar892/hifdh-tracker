@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface ErrorResponse {
-  error: string;
-}
+export type GetStudentCalendarParams = {
+  /**
+   * Month to fetch (YYYY-MM)
+   */
+  month: string;
+};

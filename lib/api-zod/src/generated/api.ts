@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import * as zod from "zod";
 
@@ -43,7 +43,7 @@ export const GetSessionResponse = zod.object({
  * @summary List all students
  */
 export const ListStudentsQueryParams = zod.object({
-  active: zod.coerce.boolean().optional().describe("Filter by active status"),
+  active: zod.coerce.boolean().optional(),
 });
 
 export const ListStudentsResponseItem = zod.object({
@@ -51,21 +51,21 @@ export const ListStudentsResponseItem = zod.object({
   name: zod.string(),
   currentSurah: zod.number(),
   currentAyah: zod.number(),
-  startDate: zod.date(),
+  startDate: zod.string(),
   notes: zod.string().nullish(),
   active: zod.boolean(),
-  createdAt: zod.date(),
+  createdAt: zod.string(),
 });
 export const ListStudentsResponse = zod.array(ListStudentsResponseItem);
 
 /**
- * @summary Create a new student
+ * @summary Create a student
  */
 export const CreateStudentBody = zod.object({
   name: zod.string(),
   currentSurah: zod.number(),
   currentAyah: zod.number(),
-  startDate: zod.date(),
+  startDate: zod.string(),
   notes: zod.string().nullish(),
 });
 
@@ -81,10 +81,10 @@ export const GetStudentResponse = zod.object({
   name: zod.string(),
   currentSurah: zod.number(),
   currentAyah: zod.number(),
-  startDate: zod.date(),
+  startDate: zod.string(),
   notes: zod.string().nullish(),
   active: zod.boolean(),
-  createdAt: zod.date(),
+  createdAt: zod.string(),
 });
 
 /**
@@ -98,6 +98,7 @@ export const UpdateStudentBody = zod.object({
   name: zod.string().optional(),
   currentSurah: zod.number().optional(),
   currentAyah: zod.number().optional(),
+  startDate: zod.string().optional(),
   notes: zod.string().nullish(),
   active: zod.boolean().optional(),
 });
@@ -107,209 +108,195 @@ export const UpdateStudentResponse = zod.object({
   name: zod.string(),
   currentSurah: zod.number(),
   currentAyah: zod.number(),
-  startDate: zod.date(),
+  startDate: zod.string(),
   notes: zod.string().nullish(),
   active: zod.boolean(),
-  createdAt: zod.date(),
+  createdAt: zod.string(),
 });
 
 /**
- * @summary List daily entries for a student
+ * @summary List weekly entries for a student
  */
-export const ListEntriesParams = zod.object({
+export const ListWeeklyEntriesParams = zod.object({
   studentId: zod.coerce.number(),
 });
 
-export const listEntriesQueryLimitDefault = 50;
-export const listEntriesQueryOffsetDefault = 0;
+export const listWeeklyEntriesQueryLimitDefault = 52;
+export const listWeeklyEntriesQueryOffsetDefault = 0;
 
-export const ListEntriesQueryParams = zod.object({
-  month: zod.coerce
-    .string()
-    .optional()
-    .describe("Filter by month (YYYY-MM format)"),
-  limit: zod.coerce.number().default(listEntriesQueryLimitDefault),
-  offset: zod.coerce.number().default(listEntriesQueryOffsetDefault),
+export const ListWeeklyEntriesQueryParams = zod.object({
+  month: zod.coerce.string().optional().describe("Filter by month (YYYY-MM)"),
+  limit: zod.coerce.number().default(listWeeklyEntriesQueryLimitDefault),
+  offset: zod.coerce.number().default(listWeeklyEntriesQueryOffsetDefault),
 });
 
-export const ListEntriesResponseItem = zod.object({
+export const ListWeeklyEntriesResponseItem = zod.object({
   id: zod.number(),
   studentId: zod.number(),
-  date: zod.date(),
-  newMemorizationFromSurah: zod.number().nullish(),
-  newMemorizationFromAyah: zod.number().nullish(),
-  newMemorizationToSurah: zod.number().nullish(),
-  newMemorizationToAyah: zod.number().nullish(),
-  newMemorizationCompleted: zod.boolean(),
-  newMemorizationGrade: zod
+  weekStartDate: zod.string(),
+  weekEndDate: zod.string(),
+  newMemFromSurah: zod.number().nullish(),
+  newMemFromAyah: zod.number().nullish(),
+  newMemToSurah: zod.number().nullish(),
+  newMemToAyah: zod.number().nullish(),
+  ayahsMemorized: zod.number(),
+  successfulDays: zod.number(),
+  daysAttended: zod.number(),
+  weekRating: zod
+    .enum([
+      "excellent",
+      "strong",
+      "steady",
+      "needs_improvement",
+      "difficult_week",
+    ])
+    .nullish(),
+  rmvQuality: zod
     .enum(["excellent", "good", "needs_repeat", "incomplete"])
     .nullish(),
-  rmvFromSurah: zod.number().nullish(),
-  rmvFromAyah: zod.number().nullish(),
-  rmvToSurah: zod.number().nullish(),
-  rmvToAyah: zod.number().nullish(),
-  rmvCompleted: zod.boolean(),
-  rmvGrade: zod
+  reviewQuality: zod
     .enum(["excellent", "good", "needs_repeat", "incomplete"])
     .nullish(),
-  reviewFromSurah: zod.number().nullish(),
-  reviewFromAyah: zod.number().nullish(),
-  reviewToSurah: zod.number().nullish(),
-  reviewToAyah: zod.number().nullish(),
-  reviewCompleted: zod.boolean(),
-  reviewGrade: zod
-    .enum(["excellent", "good", "needs_repeat", "incomplete"])
-    .nullish(),
-  extraReviewFromSurah: zod.number().nullish(),
-  extraReviewFromAyah: zod.number().nullish(),
-  extraReviewToSurah: zod.number().nullish(),
-  extraReviewToAyah: zod.number().nullish(),
   teacherNotes: zod.string().nullish(),
-  daySuccessful: zod.boolean(),
-  createdAt: zod.date(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
 });
-export const ListEntriesResponse = zod.array(ListEntriesResponseItem);
+export const ListWeeklyEntriesResponse = zod.array(
+  ListWeeklyEntriesResponseItem,
+);
 
 /**
- * @summary Get entry for a specific date
+ * @summary Get a specific weekly entry
  */
-export const GetEntryParams = zod.object({
+export const GetWeeklyEntryParams = zod.object({
   studentId: zod.coerce.number(),
-  date: zod.date(),
+  weekStart: zod.coerce.string().describe("Monday date (YYYY-MM-DD)"),
 });
 
-export const GetEntryResponse = zod.object({
+export const GetWeeklyEntryResponse = zod.object({
   id: zod.number(),
   studentId: zod.number(),
-  date: zod.date(),
-  newMemorizationFromSurah: zod.number().nullish(),
-  newMemorizationFromAyah: zod.number().nullish(),
-  newMemorizationToSurah: zod.number().nullish(),
-  newMemorizationToAyah: zod.number().nullish(),
-  newMemorizationCompleted: zod.boolean(),
-  newMemorizationGrade: zod
+  weekStartDate: zod.string(),
+  weekEndDate: zod.string(),
+  newMemFromSurah: zod.number().nullish(),
+  newMemFromAyah: zod.number().nullish(),
+  newMemToSurah: zod.number().nullish(),
+  newMemToAyah: zod.number().nullish(),
+  ayahsMemorized: zod.number(),
+  successfulDays: zod.number(),
+  daysAttended: zod.number(),
+  weekRating: zod
+    .enum([
+      "excellent",
+      "strong",
+      "steady",
+      "needs_improvement",
+      "difficult_week",
+    ])
+    .nullish(),
+  rmvQuality: zod
     .enum(["excellent", "good", "needs_repeat", "incomplete"])
     .nullish(),
-  rmvFromSurah: zod.number().nullish(),
-  rmvFromAyah: zod.number().nullish(),
-  rmvToSurah: zod.number().nullish(),
-  rmvToAyah: zod.number().nullish(),
-  rmvCompleted: zod.boolean(),
-  rmvGrade: zod
+  reviewQuality: zod
     .enum(["excellent", "good", "needs_repeat", "incomplete"])
     .nullish(),
-  reviewFromSurah: zod.number().nullish(),
-  reviewFromAyah: zod.number().nullish(),
-  reviewToSurah: zod.number().nullish(),
-  reviewToAyah: zod.number().nullish(),
-  reviewCompleted: zod.boolean(),
-  reviewGrade: zod
-    .enum(["excellent", "good", "needs_repeat", "incomplete"])
-    .nullish(),
-  extraReviewFromSurah: zod.number().nullish(),
-  extraReviewFromAyah: zod.number().nullish(),
-  extraReviewToSurah: zod.number().nullish(),
-  extraReviewToAyah: zod.number().nullish(),
   teacherNotes: zod.string().nullish(),
-  daySuccessful: zod.boolean(),
-  createdAt: zod.date(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
 });
 
 /**
- * @summary Create or update entry for a date
+ * @summary Create or update a weekly entry
  */
-export const UpsertEntryParams = zod.object({
+export const UpsertWeeklyEntryParams = zod.object({
   studentId: zod.coerce.number(),
-  date: zod.date(),
+  weekStart: zod.coerce.string().describe("Monday date (YYYY-MM-DD)"),
 });
 
-export const UpsertEntryBody = zod.object({
-  newMemorizationFromSurah: zod.number().nullish(),
-  newMemorizationFromAyah: zod.number().nullish(),
-  newMemorizationToSurah: zod.number().nullish(),
-  newMemorizationToAyah: zod.number().nullish(),
-  newMemorizationCompleted: zod.boolean(),
-  newMemorizationGrade: zod
+export const upsertWeeklyEntryBodySuccessfulDaysMin = 0;
+export const upsertWeeklyEntryBodySuccessfulDaysMax = 5;
+
+export const upsertWeeklyEntryBodyDaysAttendedMin = 0;
+export const upsertWeeklyEntryBodyDaysAttendedMax = 5;
+
+export const UpsertWeeklyEntryBody = zod.object({
+  newMemFromSurah: zod.number().nullish(),
+  newMemFromAyah: zod.number().nullish(),
+  newMemToSurah: zod.number().nullish(),
+  newMemToAyah: zod.number().nullish(),
+  successfulDays: zod
+    .number()
+    .min(upsertWeeklyEntryBodySuccessfulDaysMin)
+    .max(upsertWeeklyEntryBodySuccessfulDaysMax),
+  daysAttended: zod
+    .number()
+    .min(upsertWeeklyEntryBodyDaysAttendedMin)
+    .max(upsertWeeklyEntryBodyDaysAttendedMax),
+  weekRating: zod
+    .enum([
+      "excellent",
+      "strong",
+      "steady",
+      "needs_improvement",
+      "difficult_week",
+    ])
+    .nullish(),
+  rmvQuality: zod
     .enum(["excellent", "good", "needs_repeat", "incomplete"])
     .nullish(),
-  rmvFromSurah: zod.number().nullish(),
-  rmvFromAyah: zod.number().nullish(),
-  rmvToSurah: zod.number().nullish(),
-  rmvToAyah: zod.number().nullish(),
-  rmvCompleted: zod.boolean(),
-  rmvGrade: zod
+  reviewQuality: zod
     .enum(["excellent", "good", "needs_repeat", "incomplete"])
     .nullish(),
-  reviewFromSurah: zod.number().nullish(),
-  reviewFromAyah: zod.number().nullish(),
-  reviewToSurah: zod.number().nullish(),
-  reviewToAyah: zod.number().nullish(),
-  reviewCompleted: zod.boolean(),
-  reviewGrade: zod
-    .enum(["excellent", "good", "needs_repeat", "incomplete"])
-    .nullish(),
-  extraReviewFromSurah: zod.number().nullish(),
-  extraReviewFromAyah: zod.number().nullish(),
-  extraReviewToSurah: zod.number().nullish(),
-  extraReviewToAyah: zod.number().nullish(),
   teacherNotes: zod.string().nullish(),
 });
 
-export const UpsertEntryResponse = zod.object({
+export const UpsertWeeklyEntryResponse = zod.object({
   id: zod.number(),
   studentId: zod.number(),
-  date: zod.date(),
-  newMemorizationFromSurah: zod.number().nullish(),
-  newMemorizationFromAyah: zod.number().nullish(),
-  newMemorizationToSurah: zod.number().nullish(),
-  newMemorizationToAyah: zod.number().nullish(),
-  newMemorizationCompleted: zod.boolean(),
-  newMemorizationGrade: zod
+  weekStartDate: zod.string(),
+  weekEndDate: zod.string(),
+  newMemFromSurah: zod.number().nullish(),
+  newMemFromAyah: zod.number().nullish(),
+  newMemToSurah: zod.number().nullish(),
+  newMemToAyah: zod.number().nullish(),
+  ayahsMemorized: zod.number(),
+  successfulDays: zod.number(),
+  daysAttended: zod.number(),
+  weekRating: zod
+    .enum([
+      "excellent",
+      "strong",
+      "steady",
+      "needs_improvement",
+      "difficult_week",
+    ])
+    .nullish(),
+  rmvQuality: zod
     .enum(["excellent", "good", "needs_repeat", "incomplete"])
     .nullish(),
-  rmvFromSurah: zod.number().nullish(),
-  rmvFromAyah: zod.number().nullish(),
-  rmvToSurah: zod.number().nullish(),
-  rmvToAyah: zod.number().nullish(),
-  rmvCompleted: zod.boolean(),
-  rmvGrade: zod
+  reviewQuality: zod
     .enum(["excellent", "good", "needs_repeat", "incomplete"])
     .nullish(),
-  reviewFromSurah: zod.number().nullish(),
-  reviewFromAyah: zod.number().nullish(),
-  reviewToSurah: zod.number().nullish(),
-  reviewToAyah: zod.number().nullish(),
-  reviewCompleted: zod.boolean(),
-  reviewGrade: zod
-    .enum(["excellent", "good", "needs_repeat", "incomplete"])
-    .nullish(),
-  extraReviewFromSurah: zod.number().nullish(),
-  extraReviewFromAyah: zod.number().nullish(),
-  extraReviewToSurah: zod.number().nullish(),
-  extraReviewToAyah: zod.number().nullish(),
   teacherNotes: zod.string().nullish(),
-  daySuccessful: zod.boolean(),
-  createdAt: zod.date(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
 });
 
 /**
- * @summary Get student KPIs
+ * @summary Get KPI stats for a student
  */
 export const GetStudentStatsParams = zod.object({
   studentId: zod.coerce.number(),
 });
 
 export const GetStudentStatsResponse = zod.object({
-  studentId: zod.number(),
   totalAyahsMemorized: zod.number(),
   totalQuranPercentage: zod.number(),
   juzCompleted: zod.number(),
-  successfulDaysPercent: zod.number(),
-  currentStreak: zod.number(),
-  thisMonthSuccessRate: zod.number(),
-  ayahsMemorizedThisMonth: zod.number(),
-  ayahsMemorizedThisWeek: zod.number(),
-  ayahsMemorizedLastWeek: zod.number(),
+  overallSuccessRate: zod.number(),
+  currentStreakWeeks: zod.number(),
+  ayahsThisMonth: zod.number(),
+  ayahsLastMonth: zod.number(),
 });
 
 /**
@@ -317,29 +304,92 @@ export const GetStudentStatsResponse = zod.object({
  */
 export const GetStudentCalendarParams = zod.object({
   studentId: zod.coerce.number(),
-  yearMonth: zod.coerce.string().describe("YYYY-MM format"),
+});
+
+export const GetStudentCalendarQueryParams = zod.object({
+  month: zod.coerce.string().describe("Month to fetch (YYYY-MM)"),
 });
 
 export const GetStudentCalendarResponse = zod.object({
-  yearMonth: zod.string(),
-  days: zod.array(
+  month: zod.string(),
+  weeks: zod.array(
     zod.object({
-      date: zod.date(),
-      status: zod.enum(["successful", "partial", "failed", "absent"]),
+      weekStartDate: zod.string(),
+      weekEndDate: zod.string(),
+      weekRating: zod
+        .enum([
+          "excellent",
+          "strong",
+          "steady",
+          "needs_improvement",
+          "difficult_week",
+        ])
+        .nullish(),
+      successfulDays: zod.number().nullish(),
+      daysAttended: zod.number().nullish(),
+      ayahsMemorized: zod.number().nullish(),
+      hasEntry: zod.boolean(),
     }),
   ),
-  successfulDays: zod.number(),
-  totalAttendedDays: zod.number(),
-  successRate: zod.number(),
+  totalAyahs: zod.number(),
+  avgSuccessfulDays: zod.number(),
+  excellentWeeks: zod.number(),
 });
 
 /**
- * @summary Get class-wide statistics
+ * @summary Get dashboard data for all active students
+ */
+export const GetDashboardResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  currentSurah: zod.number(),
+  currentAyah: zod.number(),
+  active: zod.boolean(),
+  thisWeekDone: zod.boolean(),
+  thisWeekEntry: zod
+    .object({
+      id: zod.number(),
+      studentId: zod.number(),
+      weekStartDate: zod.string(),
+      weekEndDate: zod.string(),
+      newMemFromSurah: zod.number().nullish(),
+      newMemFromAyah: zod.number().nullish(),
+      newMemToSurah: zod.number().nullish(),
+      newMemToAyah: zod.number().nullish(),
+      ayahsMemorized: zod.number(),
+      successfulDays: zod.number(),
+      daysAttended: zod.number(),
+      weekRating: zod
+        .enum([
+          "excellent",
+          "strong",
+          "steady",
+          "needs_improvement",
+          "difficult_week",
+        ])
+        .nullish(),
+      rmvQuality: zod
+        .enum(["excellent", "good", "needs_repeat", "incomplete"])
+        .nullish(),
+      reviewQuality: zod
+        .enum(["excellent", "good", "needs_repeat", "incomplete"])
+        .nullish(),
+      teacherNotes: zod.string().nullish(),
+      createdAt: zod.string(),
+      updatedAt: zod.string(),
+    })
+    .nullish(),
+});
+export const GetDashboardResponse = zod.array(GetDashboardResponseItem);
+
+/**
+ * @summary Class-wide statistics
  */
 export const GetClassStatsResponse = zod.object({
   totalStudents: zod.number(),
   averageSuccessRate: zod.number(),
   totalAyahsMemorized: zod.number(),
+  avgAyahsPerWeek: zod.number(),
   topPerformers: zod.array(
     zod.object({
       studentId: zod.number(),
@@ -357,33 +407,7 @@ export const GetClassStatsResponse = zod.object({
 });
 
 /**
- * @summary Get today's completion status for a student
- */
-export const GetStudentTodayStatusParams = zod.object({
-  studentId: zod.coerce.number(),
-});
-
-export const GetStudentTodayStatusResponse = zod.object({
-  status: zod.enum(["all_done", "in_progress", "not_started"]),
-  completedTasks: zod.number(),
-  totalTasks: zod.number(),
-});
-
-/**
- * @summary Get dashboard data with all students and today status
- */
-export const GetDashboardResponseItem = zod.object({
-  id: zod.number(),
-  name: zod.string(),
-  currentSurah: zod.number(),
-  currentAyah: zod.number(),
-  todayStatus: zod.enum(["all_done", "in_progress", "not_started"]),
-  completedTasks: zod.number(),
-});
-export const GetDashboardResponse = zod.array(GetDashboardResponseItem);
-
-/**
- * @summary List all 114 surahs with ayah counts
+ * @summary List all 114 surahs
  */
 export const ListSurahsResponseItem = zod.object({
   number: zod.number(),

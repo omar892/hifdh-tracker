@@ -3,12 +3,12 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
-export type ListEntriesParams = {
+export type ListWeeklyEntriesParams = {
   /**
-   * Filter by month (YYYY-MM format)
+   * Filter by month (YYYY-MM)
    */
   month?: string;
   limit?: number;

@@ -3,14 +3,15 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
-import type { PerformerSummary } from "./performerSummary";
+import type { StudentPerformance } from "./studentPerformance";
 
 export interface ClassStats {
   totalStudents: number;
   averageSuccessRate: number;
   totalAyahsMemorized: number;
-  topPerformers: PerformerSummary[];
-  needsAttention: PerformerSummary[];
+  avgAyahsPerWeek: number;
+  topPerformers: StudentPerformance[];
+  needsAttention: StudentPerformance[];
 }

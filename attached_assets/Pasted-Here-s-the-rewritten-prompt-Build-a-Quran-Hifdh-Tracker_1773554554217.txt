@@ -1,0 +1,119 @@
+Here's the rewritten prompt:
+
+Build a Quran Hifdh Tracker — Teacher Portal (iPad-optimized)
+I run a full-time hifdh (Quran memorization) program with 10+ students who attend 5 days a week, 5+ hours/day. Teachers already track daily work on paper binders. This app is NOT replacing the binder — it's the digital layer on top of it for tracking progress over time, spotting trends, and having a clean historical record. The teacher logs a weekly summary (likely on Friday after class), not daily entries.
+Tech stack:
+
+Frontend: React + Tailwind CSS
+Backend: Next.js (App Router with API routes)
+Database: PostgreSQL (Replit's built-in DB or Neon)
+Auth: Simple teacher login (single user, password-protected)
+
+
+Data model:
+Students table:
+
+id, name, current_surah, current_ayah, enrollment_date, notes, active (boolean)
+
+Weekly Entries table:
+
+id, student_id, week_start_date (Monday), week_end_date (Friday)
+new_memorization_start (surah:ayah), new_memorization_end (surah:ayah)
+ayahs_memorized_this_week (auto-calculated from range)
+successful_days (number 0-5: how many of the 5 days the student completed all 3 tasks — new memorization, RMV, and review)
+days_attended (number 0-5, defaults to 5)
+week_rating (Excellent / Strong / Steady / Needs Improvement / Difficult Week)
+rmv_quality (Excellent / Good / Needs Repeat / Incomplete)
+review_quality (Excellent / Good / Needs Repeat / Incomplete)
+teacher_notes (text, optional)
+
+Quran Reference (static seed data):
+
+All 114 surahs with name (Arabic + transliteration), ayah count, juz mapping
+Total: 6,236 ayahs across 30 juz — used for progress calculations and input validation
+
+
+Pages/Views:
+1. Dashboard (home screen):
+
+Today's date and current week range (e.g., "Week of Mar 9 – Mar 13")
+All active students as large, tappable cards in a grid
+Each card shows:
+
+Student name
+Current Quran position (surah + ayah)
+This week's status: green checkmark if weekly entry submitted, gray if pending
+Mini stat: overall success rate % in small text
+
+
+"Log This Week" button at the top that starts the weekly entry flow for all students sequentially
+
+2. Weekly Entry Flow (the core interaction — must be FAST):
+This is the screen the teacher uses most. Optimize everything for speed.
+
+Sequential student flow: Shows one student at a time, full screen. After saving, auto-advances to the next student. Teacher can also swipe left/right or tap arrows to skip around.
+Top bar: Student name (large), position indicator "Student 3 of 12", skip button
+The form — 6 fields, all tap-friendly:
+
+New memorization range: Two fields — "From" and "To" with surah dropdown + ayah number input. Pre-fill "From" with the student's current position. The "To" field becomes their new current position on save.
+Successful days: Large tap targets showing numbers 0 through 5. Tap to select — like a rating selector, not a dropdown. Think of it like picking a star rating.
+Days attended: Same style — tap targets 0 through 5. Default to 5.
+Week rating: 5 horizontal pill buttons (Excellent / Strong / Steady / Needs Improvement / Difficult Week). Tap to select. Color-coded: green → yellow → red.
+RMV quality + Review quality: Same pill button style. Can stack these side by side on iPad landscape.
+Notes: Single-line text input, expandable. Optional. Placeholder text: "Any notes for this week..."
+
+
+Save & Next button: Large, bottom of screen, prominent. Saves the entry, updates the student's current position, and slides to the next student.
+Progress bar at the very top showing how many students are done (e.g., filled bar 3/12)
+
+The entire flow for 10 students should take under 10 minutes.
+3. Student Profile page:
+KPI Summary Cards (top of profile — large, dashboard-style):
+
+Total Memorized: Displayed as juz count + ayah count + percentage of full Quran. Radial progress gauge showing percent complete (e.g., "4.2 Juz — 12.8% of Quran"). This is the hero stat, biggest card.
+Overall Success Rate: Successful days ÷ total days attended, all time. Big bold percentage with color coding (green ≥ 85%, yellow 70-84%, red < 70%).
+Current Streak: Consecutive weeks with 4+ successful days out of 5. Resets when a week drops below 4.
+This Month's Pace: Ayahs memorized in the current calendar month. Small trend arrow comparing to last month's total.
+
+Monthly Calendar View:
+
+Grid showing each week as a row or block (not individual days — since we track weekly)
+Each week block is color-coded by week rating: green (Excellent/Strong), yellow (Steady), red (Needs Improvement/Difficult Week), gray (no entry)
+Inside each week block: show successful days count (e.g., "4/5") and ayahs memorized that week
+Month navigation arrows — tap left/right to go to any previous month. Teacher needs to reference past months to see trajectory.
+Monthly summary line below: "Total: 47 ayahs memorized | Avg 4.2/5 successful days | 3 Excellent weeks"
+Tapping a week block opens that week's entry for review or editing
+
+Scrollable Weekly History:
+
+Below the calendar, a reverse-chronological list of all weekly entries
+Each row shows: week date range, memorization range, successful days, rating badge, notes preview
+Tappable to expand full details or edit
+
+4. Manage Students page:
+
+Add new student: name, starting surah/ayah, enrollment date
+Edit student info
+Deactivate student (hides from dashboard but preserves all data)
+Reactivate student
+
+
+UX requirements:
+
+iPad-first. Large tap targets everywhere. Minimum 44px touch targets. No tiny dropdowns or fiddly inputs.
+Landscape and portrait support
+The weekly entry flow is the #1 priority — make it feel like swiping through flashcards, not filling out a form
+Surah dropdown should be searchable (type "ba" and it filters to Al-Baqarah, Al-Bayyinah, etc.) with both Arabic names and transliteration
+Dark mode toggle — stored in local preferences. Teachers often use this in masjid lighting.
+Bottom tab navigation (mobile app style): Dashboard | Log Week | Students
+All rating/quality selectors should be tap pill buttons, never dropdowns. Color-coded so the teacher can tap the right one without reading — muscle memory after a few weeks.
+Save confirmations should be subtle (small toast notification), not a modal that blocks the flow
+
+
+Nice to haves (implement if straightforward):
+
+Export: Download a student's monthly or semester report as PDF — include the calendar view, KPIs, and weekly notes. Useful for parent meetings.
+Class Overview dashboard: Average success rate across all students, highest/lowest performers this month, total ayahs memorized across the whole program. A quick "state of the program" view.
+Bulk week start: One button that creates blank weekly entries for all active students and launches the sequential entry flow.
+Juz milestone markers: When a student crosses into a new juz, flag it visually on the calendar and in the history (e.g., a small star or badge). Completing a juz is a big deal.
+Absence tracking: If days_attended < 5, optionally tag reason (sick, travel, excused, unexcused). Helps explain dips in the calendar.

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
@@ -18,23 +18,23 @@ import type {
 
 import type {
   AuthResponse,
-  CalendarData,
   ClassStats,
   CreateStudentRequest,
-  DailyEntry,
   DashboardStudent,
   ErrorResponse,
+  GetStudentCalendarParams,
   HealthStatus,
-  ListEntriesParams,
   ListStudentsParams,
+  ListWeeklyEntriesParams,
   LoginRequest,
   MessageResponse,
   Student,
+  StudentCalendar,
   StudentStats,
-  SurahInfo,
-  TodayStatus,
+  Surah,
   UpdateStudentRequest,
-  UpsertEntryRequest,
+  UpsertWeeklyEntryRequest,
+  WeeklyEntry,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -458,7 +458,7 @@ export function useListStudents<
 }
 
 /**
- * @summary Create a new student
+ * @summary Create a student
  */
 export const getCreateStudentUrl = () => {
   return `/api/students`;
@@ -521,7 +521,7 @@ export type CreateStudentMutationBody = BodyType<CreateStudentRequest>;
 export type CreateStudentMutationError = ErrorType<unknown>;
 
 /**
- * @summary Create a new student
+ * @summary Create a student
  */
 export const useCreateStudent = <
   TError = ErrorType<unknown>,
@@ -718,11 +718,11 @@ export const useUpdateStudent = <
 };
 
 /**
- * @summary List daily entries for a student
+ * @summary List weekly entries for a student
  */
-export const getListEntriesUrl = (
+export const getListWeeklyEntriesUrl = (
   studentId: number,
-  params?: ListEntriesParams,
+  params?: ListWeeklyEntriesParams,
 ) => {
   const normalizedParams = new URLSearchParams();
 
@@ -735,40 +735,43 @@ export const getListEntriesUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/api/students/${studentId}/entries?${stringifiedParams}`
-    : `/api/students/${studentId}/entries`;
+    ? `/api/students/${studentId}/entries/weekly?${stringifiedParams}`
+    : `/api/students/${studentId}/entries/weekly`;
 };
 
-export const listEntries = async (
+export const listWeeklyEntries = async (
   studentId: number,
-  params?: ListEntriesParams,
+  params?: ListWeeklyEntriesParams,
   options?: RequestInit,
-): Promise<DailyEntry[]> => {
-  return customFetch<DailyEntry[]>(getListEntriesUrl(studentId, params), {
-    ...options,
-    method: "GET",
-  });
+): Promise<WeeklyEntry[]> => {
+  return customFetch<WeeklyEntry[]>(
+    getListWeeklyEntriesUrl(studentId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
 };
 
-export const getListEntriesQueryKey = (
+export const getListWeeklyEntriesQueryKey = (
   studentId: number,
-  params?: ListEntriesParams,
+  params?: ListWeeklyEntriesParams,
 ) => {
   return [
-    `/api/students/${studentId}/entries`,
+    `/api/students/${studentId}/entries/weekly`,
     ...(params ? [params] : []),
   ] as const;
 };
 
-export const getListEntriesQueryOptions = <
-  TData = Awaited<ReturnType<typeof listEntries>>,
+export const getListWeeklyEntriesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listWeeklyEntries>>,
   TError = ErrorType<unknown>,
 >(
   studentId: number,
-  params?: ListEntriesParams,
+  params?: ListWeeklyEntriesParams,
   options?: {
     query?: UseQueryOptions<
-      Awaited<ReturnType<typeof listEntries>>,
+      Awaited<ReturnType<typeof listWeeklyEntries>>,
       TError,
       TData
     >;
@@ -778,11 +781,12 @@ export const getListEntriesQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getListEntriesQueryKey(studentId, params);
+    queryOptions?.queryKey ?? getListWeeklyEntriesQueryKey(studentId, params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listEntries>>> = ({
-    signal,
-  }) => listEntries(studentId, params, { signal, ...requestOptions });
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listWeeklyEntries>>
+  > = ({ signal }) =>
+    listWeeklyEntries(studentId, params, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -790,37 +794,41 @@ export const getListEntriesQueryOptions = <
     enabled: !!studentId,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof listEntries>>,
+    Awaited<ReturnType<typeof listWeeklyEntries>>,
     TError,
     TData
   > & { queryKey: QueryKey };
 };
 
-export type ListEntriesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listEntries>>
+export type ListWeeklyEntriesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listWeeklyEntries>>
 >;
-export type ListEntriesQueryError = ErrorType<unknown>;
+export type ListWeeklyEntriesQueryError = ErrorType<unknown>;
 
 /**
- * @summary List daily entries for a student
+ * @summary List weekly entries for a student
  */
 
-export function useListEntries<
-  TData = Awaited<ReturnType<typeof listEntries>>,
+export function useListWeeklyEntries<
+  TData = Awaited<ReturnType<typeof listWeeklyEntries>>,
   TError = ErrorType<unknown>,
 >(
   studentId: number,
-  params?: ListEntriesParams,
+  params?: ListWeeklyEntriesParams,
   options?: {
     query?: UseQueryOptions<
-      Awaited<ReturnType<typeof listEntries>>,
+      Awaited<ReturnType<typeof listWeeklyEntries>>,
       TError,
       TData
     >;
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListEntriesQueryOptions(studentId, params, options);
+  const queryOptions = getListWeeklyEntriesQueryOptions(
+    studentId,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -830,36 +838,39 @@ export function useListEntries<
 }
 
 /**
- * @summary Get entry for a specific date
+ * @summary Get a specific weekly entry
  */
-export const getGetEntryUrl = (studentId: number, date: string) => {
-  return `/api/students/${studentId}/entries/${date}`;
+export const getGetWeeklyEntryUrl = (studentId: number, weekStart: string) => {
+  return `/api/students/${studentId}/entries/weekly/${weekStart}`;
 };
 
-export const getEntry = async (
+export const getWeeklyEntry = async (
   studentId: number,
-  date: string,
+  weekStart: string,
   options?: RequestInit,
-): Promise<DailyEntry> => {
-  return customFetch<DailyEntry>(getGetEntryUrl(studentId, date), {
+): Promise<WeeklyEntry> => {
+  return customFetch<WeeklyEntry>(getGetWeeklyEntryUrl(studentId, weekStart), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetEntryQueryKey = (studentId: number, date: string) => {
-  return [`/api/students/${studentId}/entries/${date}`] as const;
+export const getGetWeeklyEntryQueryKey = (
+  studentId: number,
+  weekStart: string,
+) => {
+  return [`/api/students/${studentId}/entries/weekly/${weekStart}`] as const;
 };
 
-export const getGetEntryQueryOptions = <
-  TData = Awaited<ReturnType<typeof getEntry>>,
+export const getGetWeeklyEntryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getWeeklyEntry>>,
   TError = ErrorType<ErrorResponse>,
 >(
   studentId: number,
-  date: string,
+  weekStart: string,
   options?: {
     query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getEntry>>,
+      Awaited<ReturnType<typeof getWeeklyEntry>>,
       TError,
       TData
     >;
@@ -869,47 +880,53 @@ export const getGetEntryQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getGetEntryQueryKey(studentId, date);
+    queryOptions?.queryKey ?? getGetWeeklyEntryQueryKey(studentId, weekStart);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getEntry>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getWeeklyEntry>>> = ({
     signal,
-  }) => getEntry(studentId, date, { signal, ...requestOptions });
+  }) => getWeeklyEntry(studentId, weekStart, { signal, ...requestOptions });
 
   return {
     queryKey,
     queryFn,
-    enabled: !!(studentId && date),
+    enabled: !!(studentId && weekStart),
     ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof getEntry>>, TError, TData> & {
-    queryKey: QueryKey;
-  };
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getWeeklyEntry>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
 };
 
-export type GetEntryQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getEntry>>
+export type GetWeeklyEntryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getWeeklyEntry>>
 >;
-export type GetEntryQueryError = ErrorType<ErrorResponse>;
+export type GetWeeklyEntryQueryError = ErrorType<ErrorResponse>;
 
 /**
- * @summary Get entry for a specific date
+ * @summary Get a specific weekly entry
  */
 
-export function useGetEntry<
-  TData = Awaited<ReturnType<typeof getEntry>>,
+export function useGetWeeklyEntry<
+  TData = Awaited<ReturnType<typeof getWeeklyEntry>>,
   TError = ErrorType<ErrorResponse>,
 >(
   studentId: number,
-  date: string,
+  weekStart: string,
   options?: {
     query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getEntry>>,
+      Awaited<ReturnType<typeof getWeeklyEntry>>,
       TError,
       TData
     >;
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetEntryQueryOptions(studentId, date, options);
+  const queryOptions = getGetWeeklyEntryQueryOptions(
+    studentId,
+    weekStart,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -919,44 +936,58 @@ export function useGetEntry<
 }
 
 /**
- * @summary Create or update entry for a date
+ * @summary Create or update a weekly entry
  */
-export const getUpsertEntryUrl = (studentId: number, date: string) => {
-  return `/api/students/${studentId}/entries/${date}`;
-};
-
-export const upsertEntry = async (
+export const getUpsertWeeklyEntryUrl = (
   studentId: number,
-  date: string,
-  upsertEntryRequest: UpsertEntryRequest,
-  options?: RequestInit,
-): Promise<DailyEntry> => {
-  return customFetch<DailyEntry>(getUpsertEntryUrl(studentId, date), {
-    ...options,
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(upsertEntryRequest),
-  });
+  weekStart: string,
+) => {
+  return `/api/students/${studentId}/entries/weekly/${weekStart}`;
 };
 
-export const getUpsertEntryMutationOptions = <
+export const upsertWeeklyEntry = async (
+  studentId: number,
+  weekStart: string,
+  upsertWeeklyEntryRequest: UpsertWeeklyEntryRequest,
+  options?: RequestInit,
+): Promise<WeeklyEntry> => {
+  return customFetch<WeeklyEntry>(
+    getUpsertWeeklyEntryUrl(studentId, weekStart),
+    {
+      ...options,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(upsertWeeklyEntryRequest),
+    },
+  );
+};
+
+export const getUpsertWeeklyEntryMutationOptions = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof upsertEntry>>,
+    Awaited<ReturnType<typeof upsertWeeklyEntry>>,
     TError,
-    { studentId: number; date: string; data: BodyType<UpsertEntryRequest> },
+    {
+      studentId: number;
+      weekStart: string;
+      data: BodyType<UpsertWeeklyEntryRequest>;
+    },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof upsertEntry>>,
+  Awaited<ReturnType<typeof upsertWeeklyEntry>>,
   TError,
-  { studentId: number; date: string; data: BodyType<UpsertEntryRequest> },
+  {
+    studentId: number;
+    weekStart: string;
+    data: BodyType<UpsertWeeklyEntryRequest>;
+  },
   TContext
 > => {
-  const mutationKey = ["upsertEntry"];
+  const mutationKey = ["upsertWeeklyEntry"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -966,48 +997,60 @@ export const getUpsertEntryMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof upsertEntry>>,
-    { studentId: number; date: string; data: BodyType<UpsertEntryRequest> }
+    Awaited<ReturnType<typeof upsertWeeklyEntry>>,
+    {
+      studentId: number;
+      weekStart: string;
+      data: BodyType<UpsertWeeklyEntryRequest>;
+    }
   > = (props) => {
-    const { studentId, date, data } = props ?? {};
+    const { studentId, weekStart, data } = props ?? {};
 
-    return upsertEntry(studentId, date, data, requestOptions);
+    return upsertWeeklyEntry(studentId, weekStart, data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type UpsertEntryMutationResult = NonNullable<
-  Awaited<ReturnType<typeof upsertEntry>>
+export type UpsertWeeklyEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof upsertWeeklyEntry>>
 >;
-export type UpsertEntryMutationBody = BodyType<UpsertEntryRequest>;
-export type UpsertEntryMutationError = ErrorType<unknown>;
+export type UpsertWeeklyEntryMutationBody = BodyType<UpsertWeeklyEntryRequest>;
+export type UpsertWeeklyEntryMutationError = ErrorType<unknown>;
 
 /**
- * @summary Create or update entry for a date
+ * @summary Create or update a weekly entry
  */
-export const useUpsertEntry = <
+export const useUpsertWeeklyEntry = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof upsertEntry>>,
+    Awaited<ReturnType<typeof upsertWeeklyEntry>>,
     TError,
-    { studentId: number; date: string; data: BodyType<UpsertEntryRequest> },
+    {
+      studentId: number;
+      weekStart: string;
+      data: BodyType<UpsertWeeklyEntryRequest>;
+    },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
-  Awaited<ReturnType<typeof upsertEntry>>,
+  Awaited<ReturnType<typeof upsertWeeklyEntry>>,
   TError,
-  { studentId: number; date: string; data: BodyType<UpsertEntryRequest> },
+  {
+    studentId: number;
+    weekStart: string;
+    data: BodyType<UpsertWeeklyEntryRequest>;
+  },
   TContext
 > => {
-  return useMutation(getUpsertEntryMutationOptions(options));
+  return useMutation(getUpsertWeeklyEntryMutationOptions(options));
 };
 
 /**
- * @summary Get student KPIs
+ * @summary Get KPI stats for a student
  */
 export const getGetStudentStatsUrl = (studentId: number) => {
   return `/api/students/${studentId}/stats`;
@@ -1068,7 +1111,7 @@ export type GetStudentStatsQueryResult = NonNullable<
 export type GetStudentStatsQueryError = ErrorType<unknown>;
 
 /**
- * @summary Get student KPIs
+ * @summary Get KPI stats for a student
  */
 
 export function useGetStudentStats<
@@ -1099,18 +1142,30 @@ export function useGetStudentStats<
  */
 export const getGetStudentCalendarUrl = (
   studentId: number,
-  yearMonth: string,
+  params: GetStudentCalendarParams,
 ) => {
-  return `/api/students/${studentId}/calendar/${yearMonth}`;
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/students/${studentId}/calendar?${stringifiedParams}`
+    : `/api/students/${studentId}/calendar`;
 };
 
 export const getStudentCalendar = async (
   studentId: number,
-  yearMonth: string,
+  params: GetStudentCalendarParams,
   options?: RequestInit,
-): Promise<CalendarData> => {
-  return customFetch<CalendarData>(
-    getGetStudentCalendarUrl(studentId, yearMonth),
+): Promise<StudentCalendar> => {
+  return customFetch<StudentCalendar>(
+    getGetStudentCalendarUrl(studentId, params),
     {
       ...options,
       method: "GET",
@@ -1120,9 +1175,12 @@ export const getStudentCalendar = async (
 
 export const getGetStudentCalendarQueryKey = (
   studentId: number,
-  yearMonth: string,
+  params?: GetStudentCalendarParams,
 ) => {
-  return [`/api/students/${studentId}/calendar/${yearMonth}`] as const;
+  return [
+    `/api/students/${studentId}/calendar`,
+    ...(params ? [params] : []),
+  ] as const;
 };
 
 export const getGetStudentCalendarQueryOptions = <
@@ -1130,7 +1188,7 @@ export const getGetStudentCalendarQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   studentId: number,
-  yearMonth: string,
+  params: GetStudentCalendarParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getStudentCalendar>>,
@@ -1143,18 +1201,17 @@ export const getGetStudentCalendarQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ??
-    getGetStudentCalendarQueryKey(studentId, yearMonth);
+    queryOptions?.queryKey ?? getGetStudentCalendarQueryKey(studentId, params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getStudentCalendar>>
   > = ({ signal }) =>
-    getStudentCalendar(studentId, yearMonth, { signal, ...requestOptions });
+    getStudentCalendar(studentId, params, { signal, ...requestOptions });
 
   return {
     queryKey,
     queryFn,
-    enabled: !!(studentId && yearMonth),
+    enabled: !!studentId,
     ...queryOptions,
   } as UseQueryOptions<
     Awaited<ReturnType<typeof getStudentCalendar>>,
@@ -1177,7 +1234,7 @@ export function useGetStudentCalendar<
   TError = ErrorType<unknown>,
 >(
   studentId: number,
-  yearMonth: string,
+  params: GetStudentCalendarParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getStudentCalendar>>,
@@ -1189,7 +1246,7 @@ export function useGetStudentCalendar<
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetStudentCalendarQueryOptions(
     studentId,
-    yearMonth,
+    params,
     options,
   );
 
@@ -1201,171 +1258,7 @@ export function useGetStudentCalendar<
 }
 
 /**
- * @summary Get class-wide statistics
- */
-export const getGetClassStatsUrl = () => {
-  return `/api/stats/class`;
-};
-
-export const getClassStats = async (
-  options?: RequestInit,
-): Promise<ClassStats> => {
-  return customFetch<ClassStats>(getGetClassStatsUrl(), {
-    ...options,
-    method: "GET",
-  });
-};
-
-export const getGetClassStatsQueryKey = () => {
-  return [`/api/stats/class`] as const;
-};
-
-export const getGetClassStatsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getClassStats>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getClassStats>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey = queryOptions?.queryKey ?? getGetClassStatsQueryKey();
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getClassStats>>> = ({
-    signal,
-  }) => getClassStats({ signal, ...requestOptions });
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getClassStats>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type GetClassStatsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getClassStats>>
->;
-export type GetClassStatsQueryError = ErrorType<unknown>;
-
-/**
- * @summary Get class-wide statistics
- */
-
-export function useGetClassStats<
-  TData = Awaited<ReturnType<typeof getClassStats>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getClassStats>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetClassStatsQueryOptions(options);
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-/**
- * @summary Get today's completion status for a student
- */
-export const getGetStudentTodayStatusUrl = (studentId: number) => {
-  return `/api/students/${studentId}/today-status`;
-};
-
-export const getStudentTodayStatus = async (
-  studentId: number,
-  options?: RequestInit,
-): Promise<TodayStatus> => {
-  return customFetch<TodayStatus>(getGetStudentTodayStatusUrl(studentId), {
-    ...options,
-    method: "GET",
-  });
-};
-
-export const getGetStudentTodayStatusQueryKey = (studentId: number) => {
-  return [`/api/students/${studentId}/today-status`] as const;
-};
-
-export const getGetStudentTodayStatusQueryOptions = <
-  TData = Awaited<ReturnType<typeof getStudentTodayStatus>>,
-  TError = ErrorType<unknown>,
->(
-  studentId: number,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getStudentTodayStatus>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getGetStudentTodayStatusQueryKey(studentId);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getStudentTodayStatus>>
-  > = ({ signal }) =>
-    getStudentTodayStatus(studentId, { signal, ...requestOptions });
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!studentId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getStudentTodayStatus>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type GetStudentTodayStatusQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getStudentTodayStatus>>
->;
-export type GetStudentTodayStatusQueryError = ErrorType<unknown>;
-
-/**
- * @summary Get today's completion status for a student
- */
-
-export function useGetStudentTodayStatus<
-  TData = Awaited<ReturnType<typeof getStudentTodayStatus>>,
-  TError = ErrorType<unknown>,
->(
-  studentId: number,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getStudentTodayStatus>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetStudentTodayStatusQueryOptions(studentId, options);
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-/**
- * @summary Get dashboard data with all students and today status
+ * @summary Get dashboard data for all active students
  */
 export const getGetDashboardUrl = () => {
   return `/api/dashboard`;
@@ -1416,7 +1309,7 @@ export type GetDashboardQueryResult = NonNullable<
 export type GetDashboardQueryError = ErrorType<unknown>;
 
 /**
- * @summary Get dashboard data with all students and today status
+ * @summary Get dashboard data for all active students
  */
 
 export function useGetDashboard<
@@ -1440,16 +1333,89 @@ export function useGetDashboard<
 }
 
 /**
- * @summary List all 114 surahs with ayah counts
+ * @summary Class-wide statistics
+ */
+export const getGetClassStatsUrl = () => {
+  return `/api/stats/class`;
+};
+
+export const getClassStats = async (
+  options?: RequestInit,
+): Promise<ClassStats> => {
+  return customFetch<ClassStats>(getGetClassStatsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetClassStatsQueryKey = () => {
+  return [`/api/stats/class`] as const;
+};
+
+export const getGetClassStatsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getClassStats>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getClassStats>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetClassStatsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getClassStats>>> = ({
+    signal,
+  }) => getClassStats({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getClassStats>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetClassStatsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getClassStats>>
+>;
+export type GetClassStatsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Class-wide statistics
+ */
+
+export function useGetClassStats<
+  TData = Awaited<ReturnType<typeof getClassStats>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getClassStats>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetClassStatsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List all 114 surahs
  */
 export const getListSurahsUrl = () => {
   return `/api/surahs`;
 };
 
-export const listSurahs = async (
-  options?: RequestInit,
-): Promise<SurahInfo[]> => {
-  return customFetch<SurahInfo[]>(getListSurahsUrl(), {
+export const listSurahs = async (options?: RequestInit): Promise<Surah[]> => {
+  return customFetch<Surah[]>(getListSurahsUrl(), {
     ...options,
     method: "GET",
   });
@@ -1491,7 +1457,7 @@ export type ListSurahsQueryResult = NonNullable<
 export type ListSurahsQueryError = ErrorType<unknown>;
 
 /**
- * @summary List all 114 surahs with ayah counts
+ * @summary List all 114 surahs
  */
 
 export function useListSurahs<

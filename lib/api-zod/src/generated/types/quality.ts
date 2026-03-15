@@ -3,12 +3,12 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
-export type Grade = (typeof Grade)[keyof typeof Grade];
+export type Quality = (typeof Quality)[keyof typeof Quality];
 
-export const Grade = {
+export const Quality = {
   excellent: "excellent",
   good: "good",
   needs_repeat: "needs_repeat",

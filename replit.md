@@ -21,7 +21,8 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 ```text
 artifacts-monorepo/
 ├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
+│   ├── api-server/         # Express API server
+│   └── hifdh-tracker/      # React + Vite frontend (iPad-optimized)
 ├── lib/                    # Shared libraries
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
@@ -56,11 +57,32 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 
 - Entry: `src/index.ts` — reads `PORT`, starts Express
 - App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
+- Routes:
+  - `src/routes/index.ts` mounts all sub-routers
+  - `src/routes/health.ts` — `GET /api/health`
+  - `src/routes/auth.ts` — `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/session`
+  - `src/routes/students.ts` — CRUD for students
+  - `src/routes/entries.ts` — Weekly entry CRUD (`/students/:id/entries/weekly`)
+  - `src/routes/stats.ts` — `/api/dashboard`, `/api/students/:id/stats`, `/api/students/:id/calendar`, `/api/stats/class`, `/api/surahs`
+  - `src/lib/quran-data.ts` — Quran surah data, ayah counting helpers (`calculateAyahsUpTo`, `calculateAyahsBetween`, `calculateJuzFromPosition`)
 - Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
+- Auth: session-based with `requireAuth` middleware; password from `TEACHER_PASSWORD` env var (default: `hifdh2024`)
+
+### `artifacts/hifdh-tracker` (`@workspace/hifdh-tracker`)
+
+iPad-optimized React + Vite frontend for the Quran Hifdh Tracker.
+
+Pages:
+- `src/pages/login.tsx` — Password login page
+- `src/pages/dashboard.tsx` — Weekly student overview with "Done/Pending" badges
+- `src/pages/log-week.tsx` — Sequential weekly entry form (one student at a time)
+- `src/pages/student-profile.tsx` — Student KPIs + monthly weekly calendar history
+- `src/pages/manage-students.tsx` — Add/edit/deactivate students
+- `src/pages/class-stats.tsx` — Class-wide statistics
+
+Key components:
+- `src/components/ui/surah-search-select.tsx` — Custom Surah dropdown with search
+- `src/components/layout/app-layout.tsx` — Sidebar + mobile bottom nav layout with dark mode (persisted to localStorage)
 
 ### `lib/db` (`@workspace/db`)
 
@@ -68,9 +90,17 @@ Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client insta
 
 - `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
 - `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
+- `src/schema/students.ts` — `students` table
+- `src/schema/weekly-entries.ts` — `weekly_entries` table (replaces old `daily_entries`)
 - `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
+
+**Weekly Entries Schema** (`weekly_entries` table):
+- `id`, `student_id`, `week_start_date` (Mon), `week_end_date` (Fri)
+- `new_mem_from_surah`, `new_mem_from_ayah`, `new_mem_to_surah`, `new_mem_to_ayah`
+- `ayahs_memorized` (computed), `successful_days`, `days_attended`
+- `week_rating` (excellent/strong/steady/needs_improvement/difficult_week)
+- `rmv_quality`, `review_quality` (excellent/good/fair/poor)
+- `teacher_notes`
 
 Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
 
@@ -85,11 +115,12 @@ Run codegen: `pnpm --filter @workspace/api-spec run codegen`
 
 ### `lib/api-zod` (`@workspace/api-zod`)
 
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
+Generated Zod schemas from the OpenAPI spec. Used by `api-server` for request/response validation.
 
 ### `lib/api-client-react` (`@workspace/api-client-react`)
 
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
+Generated React Query hooks and fetch client from the OpenAPI spec.
+- `custom-fetch.ts` — always includes `credentials: "include"` for cookie-based auth.
 
 ### `scripts` (`@workspace/scripts`)
 

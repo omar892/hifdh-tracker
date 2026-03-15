@@ -1,2 +1,2 @@
 export * from "./students";
-export * from "./daily-entries";
+export * from "./weekly-entries";

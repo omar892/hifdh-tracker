@@ -1,36 +1,56 @@
 import { Router, type IRouter } from "express";
-import { db, dailyEntriesTable, studentsTable } from "@workspace/db";
-import { eq, and, sql, desc } from "drizzle-orm";
-import { GetStudentStatsParams, GetStudentCalendarParams, GetStudentTodayStatusParams } from "@workspace/api-zod";
+import { db, weeklyEntriesTable, studentsTable } from "@workspace/db";
+import { eq, desc } from "drizzle-orm";
+import { GetStudentStatsParams, GetStudentCalendarParams } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import { SURAHS, TOTAL_QURAN_AYAHS, calculateAyahsUpTo } from "../lib/quran-data";
 
 const router: IRouter = Router();
 
-function getTodayDate(): string {
-  return new Date().toISOString().split("T")[0];
-}
-
-function getMonthStart(yearMonth: string): string {
-  return `${yearMonth}-01`;
-}
-
-function getMonthEnd(yearMonth: string): string {
-  const [year, month] = yearMonth.split("-").map(Number);
-  const lastDay = new Date(year, month, 0).getDate();
-  return `${yearMonth}-${String(lastDay).padStart(2, "0")}`;
-}
-
-function getCurrentYearMonth(): string {
+function getCurrentMonday(): string {
   const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const day = now.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setUTCDate(now.getUTCDate() + diff);
+  return monday.toISOString().split("T")[0];
 }
 
-function getWeekStart(date: Date): string {
-  const d = new Date(date);
-  const day = d.getDay();
-  d.setDate(d.getDate() - day);
+function getMonthBounds(yearMonth: string): { start: string; end: string } {
+  const [year, month] = yearMonth.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return {
+    start: `${yearMonth}-01`,
+    end: `${yearMonth}-${String(lastDay).padStart(2, "0")}`,
+  };
+}
+
+function getFridayOfWeek(mondayStr: string): string {
+  const d = new Date(mondayStr + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 4);
   return d.toISOString().split("T")[0];
+}
+
+function getWeeksInMonth(yearMonth: string): Array<{ weekStartDate: string; weekEndDate: string }> {
+  const [year, month] = yearMonth.split("-").map(Number);
+  const firstDay = new Date(Date.UTC(year, month - 1, 1));
+  const lastDay = new Date(Date.UTC(year, month, 0));
+
+  const weeks: Array<{ weekStartDate: string; weekEndDate: string }> = [];
+  let current = new Date(firstDay);
+
+  const dayOfWeek = current.getUTCDay();
+  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  current.setUTCDate(current.getUTCDate() + diff);
+
+  while (current <= lastDay) {
+    const monday = current.toISOString().split("T")[0];
+    const friday = getFridayOfWeek(monday);
+    weeks.push({ weekStartDate: monday, weekEndDate: friday });
+    current.setUTCDate(current.getUTCDate() + 7);
+  }
+
+  return weeks;
 }
 
 router.get("/students/:studentId/stats", requireAuth, async (req, res) => {
@@ -42,232 +62,188 @@ router.get("/students/:studentId/stats", requireAuth, async (req, res) => {
     return;
   }
 
-  const totalAyahsMemorized = calculateAyahsUpTo(student.currentSurah, student.currentAyah) - 1;
+  const totalAyahsMemorized = Math.max(0, calculateAyahsUpTo(student.currentSurah, student.currentAyah) - 1);
   const totalQuranPercentage = parseFloat(((totalAyahsMemorized / TOTAL_QURAN_AYAHS) * 100).toFixed(1));
-  const juzCompleted = Math.floor(totalAyahsMemorized / (TOTAL_QURAN_AYAHS / 30));
+  const juzCompleted = parseFloat((totalAyahsMemorized / (TOTAL_QURAN_AYAHS / 30)).toFixed(2));
 
   const allEntries = await db
     .select()
-    .from(dailyEntriesTable)
-    .where(eq(dailyEntriesTable.studentId, studentId))
-    .orderBy(desc(dailyEntriesTable.date));
+    .from(weeklyEntriesTable)
+    .where(eq(weeklyEntriesTable.studentId, studentId))
+    .orderBy(desc(weeklyEntriesTable.weekStartDate));
 
-  const totalDays = allEntries.length;
-  const successfulDays = allEntries.filter((e) => e.daySuccessful).length;
-  const successfulDaysPercent = totalDays > 0 ? parseFloat(((successfulDays / totalDays) * 100).toFixed(1)) : 0;
+  const totalDaysAttended = allEntries.reduce((sum, e) => sum + e.daysAttended, 0);
+  const totalSuccessfulDays = allEntries.reduce((sum, e) => sum + e.successfulDays, 0);
+  const overallSuccessRate =
+    totalDaysAttended > 0
+      ? parseFloat(((totalSuccessfulDays / totalDaysAttended) * 100).toFixed(1))
+      : 0;
 
-  let currentStreak = 0;
+  let currentStreakWeeks = 0;
   for (const entry of allEntries) {
-    if (entry.daySuccessful) {
-      currentStreak++;
+    if (entry.successfulDays >= 4) {
+      currentStreakWeeks++;
     } else {
       break;
     }
   }
 
-  const currentMonth = getCurrentYearMonth();
-  const monthEntries = allEntries.filter((e) => e.date.startsWith(currentMonth));
-  const monthSuccessful = monthEntries.filter((e) => e.daySuccessful).length;
-  const thisMonthSuccessRate = monthEntries.length > 0
-    ? parseFloat(((monthSuccessful / monthEntries.length) * 100).toFixed(1))
-    : 0;
-
-  let ayahsMemorizedThisMonth = 0;
-  for (const entry of monthEntries) {
-    if (entry.newMemorizationCompleted && entry.newMemorizationFromSurah && entry.newMemorizationToSurah &&
-        entry.newMemorizationFromAyah && entry.newMemorizationToAyah) {
-      const from = calculateAyahsUpTo(entry.newMemorizationFromSurah, entry.newMemorizationFromAyah);
-      const to = calculateAyahsUpTo(entry.newMemorizationToSurah, entry.newMemorizationToAyah);
-      ayahsMemorizedThisMonth += Math.abs(to - from) + 1;
-    }
-  }
-
   const now = new Date();
-  const thisWeekStart = getWeekStart(now);
-  const lastWeekStart = getWeekStart(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+  const thisMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const lastMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const lastMonth = `${lastMonthDate.getUTCFullYear()}-${String(lastMonthDate.getUTCMonth() + 1).padStart(2, "0")}`;
 
-  let ayahsMemorizedThisWeek = 0;
-  let ayahsMemorizedLastWeek = 0;
+  const { start: thisMonthStart, end: thisMonthEnd } = getMonthBounds(thisMonth);
+  const { start: lastMonthStart, end: lastMonthEnd } = getMonthBounds(lastMonth);
+
+  let ayahsThisMonth = 0;
+  let ayahsLastMonth = 0;
 
   for (const entry of allEntries) {
-    if (entry.newMemorizationCompleted && entry.newMemorizationFromSurah && entry.newMemorizationToSurah &&
-        entry.newMemorizationFromAyah && entry.newMemorizationToAyah) {
-      const count = Math.abs(
-        calculateAyahsUpTo(entry.newMemorizationToSurah, entry.newMemorizationToAyah) -
-        calculateAyahsUpTo(entry.newMemorizationFromSurah, entry.newMemorizationFromAyah)
-      ) + 1;
-
-      if (entry.date >= thisWeekStart) {
-        ayahsMemorizedThisWeek += count;
-      } else if (entry.date >= lastWeekStart && entry.date < thisWeekStart) {
-        ayahsMemorizedLastWeek += count;
-      }
+    if (entry.weekStartDate >= thisMonthStart && entry.weekStartDate <= thisMonthEnd) {
+      ayahsThisMonth += entry.ayahsMemorized;
+    }
+    if (entry.weekStartDate >= lastMonthStart && entry.weekStartDate <= lastMonthEnd) {
+      ayahsLastMonth += entry.ayahsMemorized;
     }
   }
 
   res.json({
-    studentId,
     totalAyahsMemorized,
     totalQuranPercentage,
     juzCompleted,
-    successfulDaysPercent,
-    currentStreak,
-    thisMonthSuccessRate,
-    ayahsMemorizedThisMonth,
-    ayahsMemorizedThisWeek,
-    ayahsMemorizedLastWeek,
+    overallSuccessRate,
+    currentStreakWeeks,
+    ayahsThisMonth,
+    ayahsLastMonth,
   });
 });
 
-router.get("/students/:studentId/calendar/:yearMonth", requireAuth, async (req, res) => {
-  const { studentId, yearMonth } = GetStudentCalendarParams.parse(req.params);
+router.get("/students/:studentId/calendar", requireAuth, async (req, res) => {
+  const { studentId } = GetStudentCalendarParams.parse(req.params);
+  const month = req.query.month as string;
 
-  const monthStart = getMonthStart(yearMonth);
-  const monthEnd = getMonthEnd(yearMonth);
-
-  const entries = await db
-    .select()
-    .from(dailyEntriesTable)
-    .where(
-      and(
-        eq(dailyEntriesTable.studentId, studentId),
-        sql`${dailyEntriesTable.date} >= ${monthStart}`,
-        sql`${dailyEntriesTable.date} <= ${monthEnd}`
-      )
-    );
-
-  const entryMap = new Map(entries.map((e) => [e.date, e]));
-
-  const [yearNum, monthNum] = yearMonth.split("-").map(Number);
-  const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
-  const days = [];
-
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${yearMonth}-${String(d).padStart(2, "0")}`;
-    const entry = entryMap.get(dateStr);
-    const dayOfWeek = new Date(yearNum, monthNum - 1, d).getDay();
-
-    let status: string;
-    if (!entry) {
-      status = "absent";
-    } else if (entry.daySuccessful) {
-      status = "successful";
-    } else {
-      const completed = [entry.newMemorizationCompleted, entry.rmvCompleted, entry.reviewCompleted].filter(Boolean).length;
-      status = completed > 0 ? "partial" : "failed";
-    }
-
-    days.push({ date: dateStr, status });
-  }
-
-  const attendedDays = entries.length;
-  const successfulDays = entries.filter((e) => e.daySuccessful).length;
-  const successRate = attendedDays > 0 ? parseFloat(((successfulDays / attendedDays) * 100).toFixed(1)) : 0;
-
-  res.json({
-    yearMonth,
-    days,
-    successfulDays,
-    totalAttendedDays: attendedDays,
-    successRate,
-  });
-});
-
-router.get("/students/:studentId/today-status", requireAuth, async (req, res) => {
-  const { studentId } = GetStudentTodayStatusParams.parse(req.params);
-  const today = getTodayDate();
-
-  const [entry] = await db
-    .select()
-    .from(dailyEntriesTable)
-    .where(and(eq(dailyEntriesTable.studentId, studentId), eq(dailyEntriesTable.date, today)));
-
-  if (!entry) {
-    res.json({ status: "not_started", completedTasks: 0, totalTasks: 3 });
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+    res.status(400).json({ error: "month query param required (YYYY-MM)" });
     return;
   }
 
-  const completed = [entry.newMemorizationCompleted, entry.rmvCompleted, entry.reviewCompleted].filter(Boolean).length;
-
-  let status: string;
-  if (completed === 3) status = "all_done";
-  else if (completed > 0) status = "in_progress";
-  else status = "not_started";
-
-  res.json({ status, completedTasks: completed, totalTasks: 3 });
-});
-
-router.get("/dashboard", requireAuth, async (req, res) => {
-  const students = await db.select().from(studentsTable).where(eq(studentsTable.active, true));
-  const today = getTodayDate();
-
-  const todayEntries = await db
+  const entries = await db
     .select()
-    .from(dailyEntriesTable)
-    .where(eq(dailyEntriesTable.date, today));
+    .from(weeklyEntriesTable)
+    .where(eq(weeklyEntriesTable.studentId, studentId))
+    .orderBy(weeklyEntriesTable.weekStartDate);
 
-  const entryMap = new Map(todayEntries.map((e) => [e.studentId, e]));
+  const entryMap = new Map(entries.map((e) => [e.weekStartDate, e]));
+  const weeks = getWeeksInMonth(month);
 
-  const dashboard = students.map((s) => {
-    const entry = entryMap.get(s.id);
-    let todayStatus: string;
-    let completedTasks = 0;
-
-    if (!entry) {
-      todayStatus = "not_started";
-    } else {
-      completedTasks = [entry.newMemorizationCompleted, entry.rmvCompleted, entry.reviewCompleted].filter(Boolean).length;
-      if (completedTasks === 3) todayStatus = "all_done";
-      else if (completedTasks > 0) todayStatus = "in_progress";
-      else todayStatus = "not_started";
-    }
-
+  const calendarWeeks = weeks.map((w) => {
+    const entry = entryMap.get(w.weekStartDate);
     return {
-      id: s.id,
-      name: s.name,
-      currentSurah: s.currentSurah,
-      currentAyah: s.currentAyah,
-      todayStatus,
-      completedTasks,
+      weekStartDate: w.weekStartDate,
+      weekEndDate: w.weekEndDate,
+      hasEntry: !!entry,
+      weekRating: entry?.weekRating ?? null,
+      successfulDays: entry?.successfulDays ?? null,
+      daysAttended: entry?.daysAttended ?? null,
+      ayahsMemorized: entry?.ayahsMemorized ?? null,
     };
   });
 
-  res.json(dashboard);
+  const weeksWithEntries = calendarWeeks.filter((w) => w.hasEntry);
+  const totalAyahs = weeksWithEntries.reduce((sum, w) => sum + (w.ayahsMemorized ?? 0), 0);
+  const totalSuccessful = weeksWithEntries.reduce((sum, w) => sum + (w.successfulDays ?? 0), 0);
+  const avgSuccessfulDays =
+    weeksWithEntries.length > 0
+      ? parseFloat((totalSuccessful / weeksWithEntries.length).toFixed(1))
+      : 0;
+  const excellentWeeks = weeksWithEntries.filter(
+    (w) => w.weekRating === "excellent" || w.weekRating === "strong"
+  ).length;
+
+  res.json({
+    month,
+    weeks: calendarWeeks,
+    totalAyahs,
+    avgSuccessfulDays,
+    excellentWeeks,
+  });
+});
+
+router.get("/dashboard", requireAuth, async (req, res) => {
+  const students = await db
+    .select()
+    .from(studentsTable)
+    .where(eq(studentsTable.active, true));
+
+  const thisWeekMonday = getCurrentMonday();
+
+  const result = await Promise.all(
+    students.map(async (student) => {
+      const [latestEntry] = await db
+        .select()
+        .from(weeklyEntriesTable)
+        .where(eq(weeklyEntriesTable.studentId, student.id))
+        .orderBy(desc(weeklyEntriesTable.weekStartDate))
+        .limit(1);
+
+      const thisWeekDone = latestEntry?.weekStartDate === thisWeekMonday;
+
+      return {
+        id: student.id,
+        name: student.name,
+        currentSurah: student.currentSurah,
+        currentAyah: student.currentAyah,
+        active: student.active,
+        thisWeekDone,
+        thisWeekEntry: thisWeekDone ? latestEntry : null,
+      };
+    })
+  );
+
+  res.json(result);
 });
 
 router.get("/stats/class", requireAuth, async (req, res) => {
   const students = await db.select().from(studentsTable).where(eq(studentsTable.active, true));
+  const allWeeklyEntries = await db.select().from(weeklyEntriesTable);
+
+  const entryMap = new Map<number, typeof allWeeklyEntries>();
+  for (const entry of allWeeklyEntries) {
+    if (!entryMap.has(entry.studentId)) entryMap.set(entry.studentId, []);
+    entryMap.get(entry.studentId)!.push(entry);
+  }
 
   let totalAyahsMemorized = 0;
   const studentStats: { studentId: number; name: string; successRate: number }[] = [];
 
   for (const student of students) {
-    totalAyahsMemorized += calculateAyahsUpTo(student.currentSurah, student.currentAyah) - 1;
-
-    const entries = await db
-      .select()
-      .from(dailyEntriesTable)
-      .where(eq(dailyEntriesTable.studentId, student.id));
-
-    const total = entries.length;
-    const successful = entries.filter((e) => e.daySuccessful).length;
-    const rate = total > 0 ? parseFloat(((successful / total) * 100).toFixed(1)) : 0;
-
+    totalAyahsMemorized += Math.max(0, calculateAyahsUpTo(student.currentSurah, student.currentAyah) - 1);
+    const entries = entryMap.get(student.id) ?? [];
+    const totalDays = entries.reduce((s, e) => s + e.daysAttended, 0);
+    const successDays = entries.reduce((s, e) => s + e.successfulDays, 0);
+    const rate = totalDays > 0 ? parseFloat(((successDays / totalDays) * 100).toFixed(1)) : 0;
     studentStats.push({ studentId: student.id, name: student.name, successRate: rate });
   }
 
   studentStats.sort((a, b) => b.successRate - a.successRate);
+  const avgRate =
+    studentStats.length > 0
+      ? parseFloat((studentStats.reduce((s, st) => s + st.successRate, 0) / studentStats.length).toFixed(1))
+      : 0;
 
-  const avgRate = studentStats.length > 0
-    ? parseFloat((studentStats.reduce((sum, s) => sum + s.successRate, 0) / studentStats.length).toFixed(1))
-    : 0;
+  const avgAyahsPerWeek =
+    allWeeklyEntries.length > 0
+      ? parseFloat((allWeeklyEntries.reduce((s, e) => s + e.ayahsMemorized, 0) / allWeeklyEntries.length).toFixed(1))
+      : 0;
 
   res.json({
     totalStudents: students.length,
     averageSuccessRate: avgRate,
     totalAyahsMemorized,
+    avgAyahsPerWeek,
     topPerformers: studentStats.slice(0, 3),
-    needsAttention: studentStats.slice(-3).reverse(),
+    needsAttention: studentStats.filter((s) => s.successRate < 70).slice(0, 3),
   });
 });
 
