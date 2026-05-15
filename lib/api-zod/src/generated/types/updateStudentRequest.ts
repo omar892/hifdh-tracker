@@ -3,14 +3,25 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
+import type { UpdateStudentRequestGender } from "./updateStudentRequestGender";
 
 export interface UpdateStudentRequest {
   name?: string;
-  currentSurah?: number;
-  currentAyah?: number;
+  gender?: UpdateStudentRequestGender;
+  /**
+   * @minimum 1
+   * @maximum 604
+   */
+  currentPage?: number;
+  /**
+   * @minimum 1
+   * @maximum 15
+   */
+  currentLine?: number;
   startDate?: string;
   notes?: string | null;
   active?: boolean;
+  completedJuz?: number[];
 }

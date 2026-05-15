@@ -1,9 +1,10 @@
 import { Router, type IRouter } from "express";
-import { db, weeklyEntriesTable, studentsTable } from "@workspace/db";
+import { db, weeklyEntriesTable, studentsTable, studentCompletedJuzTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { GetStudentStatsParams, GetStudentCalendarParams } from "@workspace/api-zod";
+import { GetStudentStatsParams, GetStudentCalendarParams, GetStudentProjectionsParams } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
-import { SURAHS, TOTAL_QURAN_AYAHS, calculateAyahsUpTo } from "../lib/quran-data";
+import { SURAHS, TOTAL_LINES, getLinesForCompletedJuz } from "../lib/quran-data";
+import { getCompletedJuz } from "./students";
 
 const router: IRouter = Router();
 
@@ -62,9 +63,10 @@ router.get("/students/:studentId/stats", requireAuth, async (req, res) => {
     return;
   }
 
-  const totalAyahsMemorized = Math.max(0, calculateAyahsUpTo(student.currentSurah, student.currentAyah) - 1);
-  const totalQuranPercentage = parseFloat(((totalAyahsMemorized / TOTAL_QURAN_AYAHS) * 100).toFixed(1));
-  const juzCompleted = parseFloat((totalAyahsMemorized / (TOTAL_QURAN_AYAHS / 30)).toFixed(2));
+  const completedJuz = await getCompletedJuz(student.id);
+  const totalLinesMemorized = getLinesForCompletedJuz(completedJuz);
+  const totalQuranPercentage = parseFloat(((totalLinesMemorized / TOTAL_LINES) * 100).toFixed(1));
+  const juzCompleted = completedJuz.length;
 
   const allEntries = await db
     .select()
@@ -96,26 +98,25 @@ router.get("/students/:studentId/stats", requireAuth, async (req, res) => {
   const { start: thisMonthStart, end: thisMonthEnd } = getMonthBounds(thisMonth);
   const { start: lastMonthStart, end: lastMonthEnd } = getMonthBounds(lastMonth);
 
-  let ayahsThisMonth = 0;
-  let ayahsLastMonth = 0;
+  let linesThisMonth = 0;
+  let linesLastMonth = 0;
 
   for (const entry of allEntries) {
-    if (entry.weekStartDate >= thisMonthStart && entry.weekStartDate <= thisMonthEnd) {
-      ayahsThisMonth += entry.ayahsMemorized;
-    }
-    if (entry.weekStartDate >= lastMonthStart && entry.weekStartDate <= lastMonthEnd) {
-      ayahsLastMonth += entry.ayahsMemorized;
-    }
+    const inThisMonth = entry.weekStartDate >= thisMonthStart && entry.weekStartDate <= thisMonthEnd;
+    const inLastMonth = entry.weekStartDate >= lastMonthStart && entry.weekStartDate <= lastMonthEnd;
+
+    if (inThisMonth) linesThisMonth += entry.memorizationLines;
+    if (inLastMonth) linesLastMonth += entry.memorizationLines;
   }
 
   res.json({
-    totalAyahsMemorized,
+    totalLinesMemorized,
     totalQuranPercentage,
     juzCompleted,
     overallSuccessRate,
     currentStreakWeeks,
-    ayahsThisMonth,
-    ayahsLastMonth,
+    linesThisMonth,
+    linesLastMonth,
   });
 });
 
@@ -146,12 +147,13 @@ router.get("/students/:studentId/calendar", requireAuth, async (req, res) => {
       weekRating: entry?.weekRating ?? null,
       successfulDays: entry?.successfulDays ?? null,
       daysAttended: entry?.daysAttended ?? null,
-      ayahsMemorized: entry?.ayahsMemorized ?? null,
+      linesMemorized: entry?.memorizationLines ?? null,
+      weeklyPoints: entry?.weeklyPoints ?? null,
     };
   });
 
   const weeksWithEntries = calendarWeeks.filter((w) => w.hasEntry);
-  const totalAyahs = weeksWithEntries.reduce((sum, w) => sum + (w.ayahsMemorized ?? 0), 0);
+  const totalLines = weeksWithEntries.reduce((sum, w) => sum + (w.linesMemorized ?? 0), 0);
   const totalSuccessful = weeksWithEntries.reduce((sum, w) => sum + (w.successfulDays ?? 0), 0);
   const avgSuccessfulDays =
     weeksWithEntries.length > 0
@@ -164,7 +166,7 @@ router.get("/students/:studentId/calendar", requireAuth, async (req, res) => {
   res.json({
     month,
     weeks: calendarWeeks,
-    totalAyahs,
+    totalLines,
     avgSuccessfulDays,
     excellentWeeks,
   });
@@ -188,21 +190,276 @@ router.get("/dashboard", requireAuth, async (req, res) => {
         .limit(1);
 
       const thisWeekDone = latestEntry?.weekStartDate === thisWeekMonday;
+      const completedJuz = await getCompletedJuz(student.id);
 
       return {
         id: student.id,
         name: student.name,
-        currentSurah: student.currentSurah,
-        currentAyah: student.currentAyah,
+        gender: student.gender ?? null,
+        currentPage: student.currentPage,
+        currentLine: student.currentLine,
         active: student.active,
         thisWeekDone,
         thisWeekEntry: thisWeekDone ? latestEntry : null,
+        completedJuz,
       };
     })
   );
 
   res.json(result);
 });
+
+/* ── Attention flag logic ─────────────────────────── */
+
+const RATING_TIERS: Record<string, number> = {
+  excellent: 5,
+  strong: 4,
+  steady: 3,
+  needs_improvement: 2,
+  difficult_week: 1,
+};
+
+type EntryRow = {
+  weekStartDate: string;
+  successfulDays: number;
+  daysAttended: number;
+  weekRating: string | null;
+  memorizationLines: number;
+};
+
+function computeAttentionFlags(
+  recentEntries: EntryRow[],
+  thisWeekMonday: string,
+): { type: string; label: string }[] {
+  const flags: { type: string; label: string }[] = [];
+  const last2 = recentEntries.slice(0, 2);
+  if (last2.length < 2) {
+    const now = new Date();
+    const dayOfWeek = now.getUTCDay();
+    const isThursdayOrLater = dayOfWeek === 0 || dayOfWeek >= 4;
+    if (isThursdayOrLater && (last2.length === 0 || last2[0].weekStartDate !== thisWeekMonday)) {
+      flags.push({ type: "missing_entry", label: "No entry this week" });
+    }
+    return flags;
+  }
+
+  const bothLowSuccess = last2.every((e) => {
+    const rate = e.daysAttended > 0 ? e.successfulDays / e.daysAttended : 0;
+    return rate < 0.6;
+  });
+  if (bothLowSuccess) {
+    flags.push({ type: "low_success", label: "Low success rate (2 weeks)" });
+  }
+
+  const bothBadRating = last2.every((e) =>
+    e.weekRating === "needs_improvement" || e.weekRating === "difficult_week"
+  );
+  if (bothBadRating) {
+    flags.push({ type: "rating_decline", label: "2-week rating concern" });
+  }
+
+  if (last2.length >= 2 && last2[0].weekRating && last2[1].weekRating) {
+    const prevTier = RATING_TIERS[last2[1].weekRating] ?? 3;
+    const currTier = RATING_TIERS[last2[0].weekRating] ?? 3;
+    if (prevTier - currTier >= 2) {
+      flags.push({ type: "rating_drop", label: "Sharp rating drop" });
+    }
+  }
+
+  const bothLowAttendance = last2.every((e) => e.daysAttended <= 3);
+  if (bothLowAttendance) {
+    flags.push({ type: "attendance_drop", label: "Attendance drop" });
+  }
+
+  const now = new Date();
+  const dayOfWeek = now.getUTCDay();
+  const isThursdayOrLater = dayOfWeek === 0 || dayOfWeek >= 4;
+  if (isThursdayOrLater && last2[0].weekStartDate !== thisWeekMonday) {
+    flags.push({ type: "missing_entry", label: "No entry this week" });
+  }
+
+  return flags;
+}
+
+/* ── Spotlight logic ──────────────────────────────── */
+
+type SpotlightItem = {
+  studentId: number;
+  name: string;
+  insightText: string;
+  type: string;
+  category: "positive" | "concern";
+  priority: number;
+};
+
+function computeSpotlights(
+  students: { id: number; name: string; currentPage: number }[],
+  entryMap: Map<number, EntryRow[]>,
+  thisWeekMonday: string,
+): SpotlightItem[] {
+  const positives: SpotlightItem[] = [];
+  const concerns: SpotlightItem[] = [];
+
+  for (const student of students) {
+    const entries = entryMap.get(student.id) ?? [];
+    if (entries.length < 2) continue;
+
+    const thisWeek = entries[0];
+    const lastWeek = entries[1];
+
+    // 1. Biggest week-over-week increase (>20%)
+    if (lastWeek.memorizationLines > 0) {
+      const pctChange = (thisWeek.memorizationLines - lastWeek.memorizationLines) / lastWeek.memorizationLines;
+      if (pctChange > 0.2) {
+        const delta = thisWeek.memorizationLines - lastWeek.memorizationLines;
+        positives.push({
+          studentId: student.id,
+          name: student.name,
+          insightText: `+${delta} lines vs last week (${Math.round(pctChange * 100)}% increase)`,
+          type: "big_increase",
+          category: "positive",
+          priority: pctChange * 100,
+        });
+      }
+    }
+
+    // 2. First "Excellent" in 4+ weeks
+    if (thisWeek.weekRating === "excellent" && entries.length >= 4) {
+      const recentPrior = entries.slice(1, 5);
+      const hadExcellent = recentPrior.some((e) => e.weekRating === "excellent");
+      if (!hadExcellent) {
+        positives.push({
+          studentId: student.id,
+          name: student.name,
+          insightText: "First Excellent rating in 4+ weeks",
+          type: "first_excellent",
+          category: "positive",
+          priority: 90,
+        });
+      }
+    }
+
+    // 3. New personal record for lines (needs 4+ weeks)
+    if (entries.length >= 4) {
+      const prevMax = Math.max(...entries.slice(1).map((e) => e.memorizationLines));
+      if (thisWeek.memorizationLines > prevMax && prevMax > 0) {
+        positives.push({
+          studentId: student.id,
+          name: student.name,
+          insightText: `New personal record: ${thisWeek.memorizationLines} lines in a week`,
+          type: "personal_record",
+          category: "positive",
+          priority: 85,
+        });
+      }
+    }
+
+    // 4. Hit milestone page (every 50 pages)
+    if (thisWeek.weekStartDate === thisWeekMonday) {
+      const currentMilestone = Math.floor(student.currentPage / 50) * 50;
+      if (currentMilestone > 0) {
+        // Check if they recently crossed this boundary
+        const prevEntryWithPage = entries.find((e, i) => i > 0 && (e as any).currentPage != null);
+        if (prevEntryWithPage) {
+          const prevPage = (prevEntryWithPage as any).currentPage as number;
+          const prevMilestone = Math.floor(prevPage / 50) * 50;
+          if (currentMilestone > prevMilestone) {
+            positives.push({
+              studentId: student.id,
+              name: student.name,
+              insightText: `Reached page ${currentMilestone} milestone!`,
+              type: "milestone_page",
+              category: "positive",
+              priority: 80,
+            });
+          }
+        }
+      }
+    }
+
+    // 5. Perfect 5/5 successful days for 4+ consecutive weeks
+    if (entries.length >= 4) {
+      const last4 = entries.slice(0, 4);
+      const allPerfect = last4.every((e) => e.successfulDays >= 5);
+      if (allPerfect) {
+        positives.push({
+          studentId: student.id,
+          name: student.name,
+          insightText: "Perfect 5/5 successful days for 4+ weeks straight",
+          type: "perfect_streak",
+          category: "positive",
+          priority: 95,
+        });
+      }
+    }
+
+    // 6. Biggest week-over-week drop (>30%)
+    if (lastWeek.memorizationLines > 0) {
+      const pctDrop = (lastWeek.memorizationLines - thisWeek.memorizationLines) / lastWeek.memorizationLines;
+      if (pctDrop > 0.3) {
+        const delta = lastWeek.memorizationLines - thisWeek.memorizationLines;
+        concerns.push({
+          studentId: student.id,
+          name: student.name,
+          insightText: `-${delta} lines vs last week (${Math.round(pctDrop * 100)}% drop)`,
+          type: "big_drop",
+          category: "concern",
+          priority: pctDrop * 100,
+        });
+      }
+    }
+
+    // 7. First streak break after 8+ weeks
+    if (entries.length >= 9) {
+      const thisWeekGood = thisWeek.successfulDays >= 4;
+      if (!thisWeekGood) {
+        let priorStreak = 0;
+        for (let i = 1; i < entries.length; i++) {
+          if (entries[i].successfulDays >= 4) priorStreak++;
+          else break;
+        }
+        if (priorStreak >= 8) {
+          concerns.push({
+            studentId: student.id,
+            name: student.name,
+            insightText: `Streak broken after ${priorStreak} weeks`,
+            type: "streak_break",
+            category: "concern",
+            priority: 80,
+          });
+        }
+      }
+    }
+
+    // 8. Rating dropped 2+ tiers
+    if (thisWeek.weekRating && lastWeek.weekRating) {
+      const currTier = RATING_TIERS[thisWeek.weekRating] ?? 3;
+      const prevTier = RATING_TIERS[lastWeek.weekRating] ?? 3;
+      if (prevTier - currTier >= 2) {
+        concerns.push({
+          studentId: student.id,
+          name: student.name,
+          insightText: `Rating dropped from ${lastWeek.weekRating.replace(/_/g, " ")} to ${thisWeek.weekRating.replace(/_/g, " ")}`,
+          type: "rating_drop",
+          category: "concern",
+          priority: 70,
+        });
+      }
+    }
+  }
+
+  // Sort by priority desc, pick top 2 positive + top 1 concern
+  positives.sort((a, b) => b.priority - a.priority);
+  concerns.sort((a, b) => b.priority - a.priority);
+
+  const result: SpotlightItem[] = [];
+  result.push(...positives.slice(0, 2));
+  if (concerns.length > 0) result.push(concerns[0]);
+
+  return result.sort((a, b) => b.priority - a.priority);
+}
+
+/* ── /stats/class route ──────────────────────────── */
 
 router.get("/stats/class", requireAuth, async (req, res) => {
   const students = await db.select().from(studentsTable).where(eq(studentsTable.active, true));
@@ -213,37 +470,392 @@ router.get("/stats/class", requireAuth, async (req, res) => {
     if (!entryMap.has(entry.studentId)) entryMap.set(entry.studentId, []);
     entryMap.get(entry.studentId)!.push(entry);
   }
+  for (const entries of entryMap.values()) {
+    entries.sort((a, b) => b.weekStartDate.localeCompare(a.weekStartDate));
+  }
 
-  let totalAyahsMemorized = 0;
+  const thisWeekMonday = getCurrentMonday();
+  const now = new Date();
+  const thisMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const lastMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const lastMonth = `${lastMonthDate.getUTCFullYear()}-${String(lastMonthDate.getUTCMonth() + 1).padStart(2, "0")}`;
+  const { start: thisMonthStart, end: thisMonthEnd } = getMonthBounds(thisMonth);
+  const { start: lastMonthStart, end: lastMonthEnd } = getMonthBounds(lastMonth);
+
+  let totalLinesMemorized = 0;
   const studentStats: { studentId: number; name: string; successRate: number }[] = [];
+  const studentProgressList: { studentId: number; name: string; totalLines: number; totalJuz: number; weeklyPace: number }[] = [];
+  const attentionFlags: { studentId: number; name: string; flags: { type: string; label: string }[] }[] = [];
+  const streakList: { studentId: number; name: string; currentStreak: number; best12WeekStreak: number }[] = [];
+  const rankingData: { studentId: number; name: string; successRate4w: number; weeklyPace4w: number; consistency4w: number }[] = [];
+
+  let classLinesThisMonth = 0;
+  let classLinesLastMonth = 0;
+  let activeStudentsThisMonth = 0;
+  let activeStudentsLastMonth = 0;
+
+  // Monthly decomposition accumulators
+  let totalSchoolDaysThisMonth = 0;
+  let totalSchoolDaysLastMonth = 0;
+  const perStudentMonthlyDeltas: { studentId: number; name: string; linesThisMonth: number; linesLastMonth: number }[] = [];
 
   for (const student of students) {
-    totalAyahsMemorized += Math.max(0, calculateAyahsUpTo(student.currentSurah, student.currentAyah) - 1);
+    const studentJuz = await getCompletedJuz(student.id);
+    const studentTotalLines = getLinesForCompletedJuz(studentJuz);
+    totalLinesMemorized += studentTotalLines;
+
     const entries = entryMap.get(student.id) ?? [];
     const totalDays = entries.reduce((s, e) => s + e.daysAttended, 0);
     const successDays = entries.reduce((s, e) => s + e.successfulDays, 0);
     const rate = totalDays > 0 ? parseFloat(((successDays / totalDays) * 100).toFixed(1)) : 0;
     studentStats.push({ studentId: student.id, name: student.name, successRate: rate });
+
+    const last4 = entries.slice(0, 4);
+    const weeklyPace = last4.length > 0
+      ? parseFloat((last4.reduce((s, e) => s + e.memorizationLines, 0) / last4.length).toFixed(1))
+      : 0;
+    studentProgressList.push({
+      studentId: student.id,
+      name: student.name,
+      totalLines: studentTotalLines,
+      totalJuz: studentJuz.length,
+      weeklyPace,
+    });
+
+    const flags = computeAttentionFlags(entries, thisWeekMonday);
+    if (flags.length > 0) {
+      attentionFlags.push({ studentId: student.id, name: student.name, flags });
+    }
+
+    let currentStreak = 0;
+    for (const entry of entries) {
+      if (entry.successfulDays >= 4) currentStreak++;
+      else break;
+    }
+
+    const last12 = entries.slice(0, 12);
+    let best12 = 0;
+    let running = 0;
+    for (const entry of last12) {
+      if (entry.successfulDays >= 4) {
+        running++;
+        if (running > best12) best12 = running;
+      } else {
+        running = 0;
+      }
+    }
+
+    streakList.push({
+      studentId: student.id,
+      name: student.name,
+      currentStreak,
+      best12WeekStreak: best12,
+    });
+
+    const last4Entries = entries.slice(0, 4);
+    if (last4Entries.length > 0) {
+      const sr4w = (() => {
+        const attended = last4Entries.reduce((s, e) => s + e.daysAttended, 0);
+        const success = last4Entries.reduce((s, e) => s + e.successfulDays, 0);
+        return attended > 0 ? success / attended : 0;
+      })();
+
+      const pace4w = last4Entries.reduce((s, e) => s + e.memorizationLines, 0) / last4Entries.length;
+
+      const lineValues = last4Entries.map((e) => e.memorizationLines);
+      const meanLines = lineValues.reduce((s, v) => s + v, 0) / lineValues.length;
+      const variance = lineValues.reduce((s, v) => s + (v - meanLines) ** 2, 0) / lineValues.length;
+      const stdDev = Math.sqrt(variance);
+
+      rankingData.push({
+        studentId: student.id,
+        name: student.name,
+        successRate4w: sr4w,
+        weeklyPace4w: pace4w,
+        consistency4w: stdDev,
+      });
+    }
+
+    let studentLinesThisMonth = 0;
+    let studentLinesLastMonth = 0;
+    for (const entry of entries) {
+      if (entry.weekStartDate >= thisMonthStart && entry.weekStartDate <= thisMonthEnd) {
+        studentLinesThisMonth += entry.memorizationLines;
+      }
+      if (entry.weekStartDate >= lastMonthStart && entry.weekStartDate <= lastMonthEnd) {
+        studentLinesLastMonth += entry.memorizationLines;
+      }
+    }
+    classLinesThisMonth += studentLinesThisMonth;
+    classLinesLastMonth += studentLinesLastMonth;
+    if (studentLinesThisMonth > 0) activeStudentsThisMonth++;
+    if (studentLinesLastMonth > 0) activeStudentsLastMonth++;
+
+    // Track school days (daysAttended) per month
+    let daysThisMonth = 0;
+    let daysLastMonth = 0;
+    for (const entry of entries) {
+      if (entry.weekStartDate >= thisMonthStart && entry.weekStartDate <= thisMonthEnd) {
+        daysThisMonth += entry.daysAttended;
+      }
+      if (entry.weekStartDate >= lastMonthStart && entry.weekStartDate <= lastMonthEnd) {
+        daysLastMonth += entry.daysAttended;
+      }
+    }
+    totalSchoolDaysThisMonth += daysThisMonth;
+    totalSchoolDaysLastMonth += daysLastMonth;
+    perStudentMonthlyDeltas.push({
+      studentId: student.id,
+      name: student.name,
+      linesThisMonth: studentLinesThisMonth,
+      linesLastMonth: studentLinesLastMonth,
+    });
   }
+
+  // Composite Rankings
+  const avgClassPace = rankingData.length > 0
+    ? rankingData.reduce((s, r) => s + r.weeklyPace4w, 0) / rankingData.length
+    : 1;
+  const maxStdDev = Math.max(...rankingData.map((r) => r.consistency4w), 1);
+
+  const studentRankings = rankingData
+    .map((r) => {
+      const successComponent = r.successRate4w * 100 * 0.4;
+      const paceNorm = avgClassPace > 0 ? Math.min(r.weeklyPace4w / avgClassPace, 2) : 0;
+      const paceComponent = paceNorm * 50 * 0.3;
+      const consistencyNorm = maxStdDev > 0 ? 1 - (r.consistency4w / maxStdDev) : 1;
+      const consistencyComponent = Math.max(0, consistencyNorm) * 100 * 0.3;
+      const composite = Math.round(successComponent + paceComponent + consistencyComponent);
+      return {
+        studentId: r.studentId,
+        name: r.name,
+        compositeScore: Math.min(100, composite),
+        successRate: parseFloat((r.successRate4w * 100).toFixed(1)),
+        weeklyPace: parseFloat(r.weeklyPace4w.toFixed(1)),
+        consistency: parseFloat((Math.max(0, consistencyNorm) * 100).toFixed(0)),
+      };
+    })
+    .sort((a, b) => b.compositeScore - a.compositeScore);
 
   studentStats.sort((a, b) => b.successRate - a.successRate);
   const avgRate =
     studentStats.length > 0
       ? parseFloat((studentStats.reduce((s, st) => s + st.successRate, 0) / studentStats.length).toFixed(1))
       : 0;
-
-  const avgAyahsPerWeek =
+  const avgLinesPerWeek =
     allWeeklyEntries.length > 0
-      ? parseFloat((allWeeklyEntries.reduce((s, e) => s + e.ayahsMemorized, 0) / allWeeklyEntries.length).toFixed(1))
+      ? parseFloat((allWeeklyEntries.reduce((s, e) => s + e.memorizationLines, 0) / allWeeklyEntries.length).toFixed(1))
       : 0;
+
+  studentProgressList.sort((a, b) => b.totalLines - a.totalLines);
+  streakList.sort((a, b) => b.currentStreak - a.currentStreak || b.best12WeekStreak - a.best12WeekStreak);
+
+  // Weekly Trends (last 8 weeks)
+  const weeklyTrends: { weekStart: string; avgSuccessRate: number; totalLines: number; avgRating: number }[] = [];
+  {
+    const mondayDate = new Date(thisWeekMonday + "T00:00:00Z");
+    const weekDates: string[] = [];
+    for (let i = 7; i >= 0; i--) {
+      const d = new Date(mondayDate);
+      d.setUTCDate(d.getUTCDate() - i * 7);
+      weekDates.push(d.toISOString().split("T")[0]);
+    }
+
+    for (const weekStart of weekDates) {
+      const weekEntries = allWeeklyEntries.filter((e) => e.weekStartDate === weekStart);
+      if (weekEntries.length === 0) {
+        weeklyTrends.push({ weekStart, avgSuccessRate: 0, totalLines: 0, avgRating: 0 });
+        continue;
+      }
+      const totalAttended = weekEntries.reduce((s, e) => s + e.daysAttended, 0);
+      const totalSuccess = weekEntries.reduce((s, e) => s + e.successfulDays, 0);
+      const avgSuccessRate = totalAttended > 0 ? parseFloat(((totalSuccess / totalAttended) * 100).toFixed(1)) : 0;
+      const totalLines = weekEntries.reduce((s, e) => s + e.memorizationLines, 0);
+      const ratedEntries = weekEntries.filter((e) => e.weekRating != null);
+      const avgRating = ratedEntries.length > 0
+        ? parseFloat((ratedEntries.reduce((s, e) => s + (RATING_TIERS[e.weekRating!] ?? 3), 0) / ratedEntries.length).toFixed(1))
+        : 0;
+      weeklyTrends.push({ weekStart, avgSuccessRate, totalLines, avgRating });
+    }
+  }
+
+  const avgLinesPerStudentThisMonth = activeStudentsThisMonth > 0
+    ? parseFloat((classLinesThisMonth / activeStudentsThisMonth).toFixed(1))
+    : 0;
+  const avgLinesPerStudentLastMonth = activeStudentsLastMonth > 0
+    ? parseFloat((classLinesLastMonth / activeStudentsLastMonth).toFixed(1))
+    : 0;
+
+  // ── Spotlights ──
+  const spotlights = computeSpotlights(students, entryMap as any, thisWeekMonday);
+
+  // ── Monthly Decomposition ──
+  const linesPerSchoolDayThisMonth = totalSchoolDaysThisMonth > 0
+    ? parseFloat((classLinesThisMonth / totalSchoolDaysThisMonth).toFixed(1))
+    : 0;
+  const linesPerSchoolDayLastMonth = totalSchoolDaysLastMonth > 0
+    ? parseFloat((classLinesLastMonth / totalSchoolDaysLastMonth).toFixed(1))
+    : 0;
+  const biggestContributors = perStudentMonthlyDeltas
+    .map((s) => ({ studentId: s.studentId, name: s.name, linesDelta: s.linesThisMonth - s.linesLastMonth }))
+    .sort((a, b) => Math.abs(b.linesDelta) - Math.abs(a.linesDelta))
+    .slice(0, 2);
+  const monthlyDecomposition = {
+    schoolDaysThisMonth: totalSchoolDaysThisMonth,
+    schoolDaysLastMonth: totalSchoolDaysLastMonth,
+    linesPerSchoolDayThisMonth,
+    linesPerSchoolDayLastMonth,
+    biggestContributors,
+  };
+
+  // ── Rating Distributions (5 weeks) ──
+  const ratingDistributions: { weekStart: string; counts: Record<string, number> }[] = [];
+  {
+    const mondayDate = new Date(thisWeekMonday + "T00:00:00Z");
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(mondayDate);
+      d.setUTCDate(d.getUTCDate() - i * 7);
+      const weekStart = d.toISOString().split("T")[0];
+      const weekEntries = allWeeklyEntries.filter((e) => e.weekStartDate === weekStart);
+      const counts = { excellent: 0, strong: 0, steady: 0, needs_improvement: 0, difficult_week: 0 };
+      for (const e of weekEntries) {
+        if (e.weekRating && e.weekRating in counts) {
+          counts[e.weekRating as keyof typeof counts]++;
+        }
+      }
+      ratingDistributions.push({ weekStart, counts });
+    }
+  }
+
+  // ── This Week Summary + Absent Students ──
+  const thisWeekEntries = allWeeklyEntries.filter((e) => e.weekStartDate === thisWeekMonday);
+  const totalClassLines = thisWeekEntries.reduce((s, e) => s + e.memorizationLines, 0);
+  const avgLinesPerStudent = thisWeekEntries.length > 0
+    ? parseFloat((totalClassLines / thisWeekEntries.length).toFixed(1))
+    : 0;
+
+  // Best week this month
+  const thisMonthEntries = allWeeklyEntries.filter(
+    (e) => e.weekStartDate >= thisMonthStart && e.weekStartDate <= thisMonthEnd,
+  );
+  const weekTotals = new Map<string, number>();
+  for (const e of thisMonthEntries) {
+    weekTotals.set(e.weekStartDate, (weekTotals.get(e.weekStartDate) ?? 0) + e.memorizationLines);
+  }
+  const bestWeekLinesThisMonth = weekTotals.size > 0 ? Math.max(...weekTotals.values()) : 0;
+
+  const thisWeekSummary = { totalClassLines, avgLinesPerStudent, bestWeekLinesThisMonth };
+
+  // Absent students: students with <5 days attended (or no entry) this week
+  const thisWeekStudentEntries = new Map(thisWeekEntries.map((e) => [e.studentId, e]));
+  const absentStudents: { studentId: number; name: string; daysAttended: number }[] = [];
+  for (const student of students) {
+    const entry = thisWeekStudentEntries.get(student.id);
+    const daysAttended = entry?.daysAttended ?? 0;
+    if (daysAttended < 5) {
+      absentStudents.push({ studentId: student.id, name: student.name, daysAttended });
+    }
+  }
+  absentStudents.sort((a, b) => a.daysAttended - b.daysAttended);
 
   res.json({
     totalStudents: students.length,
     averageSuccessRate: avgRate,
-    totalAyahsMemorized,
-    avgAyahsPerWeek,
+    totalLinesMemorized,
+    avgLinesPerWeek: avgLinesPerWeek,
     topPerformers: studentStats.slice(0, 3),
     needsAttention: studentStats.filter((s) => s.successRate < 70).slice(0, 3),
+    studentProgress: studentProgressList,
+    studentRankings,
+    attentionFlags,
+    weeklyTrends,
+    streakLeaderboard: streakList,
+    linesThisMonth: classLinesThisMonth,
+    linesLastMonth: classLinesLastMonth,
+    activeStudentsThisMonth,
+    activeStudentsLastMonth,
+    avgLinesPerStudentThisMonth,
+    avgLinesPerStudentLastMonth,
+    spotlights: spotlights.map(({ priority: _, ...rest }) => rest),
+    monthlyDecomposition,
+    ratingDistributions,
+    thisWeekSummary,
+    absentStudents,
+  });
+});
+
+/* ── Projections ─────────────────────────────────── */
+
+const HALF_QURAN_LINES = Math.round(TOTAL_LINES / 2); // 4530
+
+router.get("/students/:studentId/projections", requireAuth, async (req, res) => {
+  const { studentId } = GetStudentProjectionsParams.parse(req.params);
+
+  const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, studentId));
+  if (!student) {
+    res.status(404).json({ error: "Student not found" });
+    return;
+  }
+
+  const completedJuz = await getCompletedJuz(student.id);
+  const totalLinesMemorized = getLinesForCompletedJuz(completedJuz);
+
+  const allEntries = await db
+    .select()
+    .from(weeklyEntriesTable)
+    .where(eq(weeklyEntriesTable.studentId, studentId))
+    .orderBy(desc(weeklyEntriesTable.weekStartDate));
+
+  const activeEntries = allEntries.filter((e) => e.daysAttended > 0);
+  const recent8 = activeEntries.slice(0, 8);
+
+  const recentTotal = recent8.reduce((sum, e) => sum + e.memorizationLines, 0);
+  const paceRecent = recent8.length > 0 ? parseFloat((recentTotal / recent8.length).toFixed(1)) : 0;
+
+  const allTimeTotal = activeEntries.reduce((sum, e) => sum + e.memorizationLines, 0);
+  const paceAllTime = activeEntries.length > 0 ? parseFloat((allTimeTotal / activeEntries.length).toFixed(1)) : 0;
+
+  const linesRemaining6Month = Math.max(0, HALF_QURAN_LINES - totalLinesMemorized);
+  const linesRemainingFull = Math.max(0, TOTAL_LINES - totalLinesMemorized);
+
+  const weeksTo6MonthGoal = paceRecent > 0 ? Math.round(linesRemaining6Month / paceRecent) : null;
+  const weeksToFullQuran = paceRecent > 0 ? Math.round(linesRemainingFull / paceRecent) : null;
+
+  const now = new Date();
+  const addWeeks = (weeks: number) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() + weeks * 7);
+    return d.toISOString().split("T")[0];
+  };
+
+  const projectedDate6Month = weeksTo6MonthGoal != null ? addWeeks(weeksTo6MonthGoal) : null;
+  const projectedDateFull = weeksToFullQuran != null ? addWeeks(weeksToFullQuran) : null;
+
+  let trend: "improving" | "declining" | "stable" = "stable";
+  if (paceAllTime > 0 && paceRecent > 0) {
+    if (paceRecent > paceAllTime * 1.1) trend = "improving";
+    else if (paceRecent < paceAllTime * 0.9) trend = "declining";
+  }
+
+  let consistencyScore = 0;
+  if (student.startDate) {
+    const startMs = new Date(student.startDate + "T00:00:00Z").getTime();
+    const totalWeeksSinceStart = Math.max(1, Math.floor((now.getTime() - startMs) / (7 * 24 * 60 * 60 * 1000)));
+    consistencyScore = parseFloat(((allEntries.length / totalWeeksSinceStart) * 100).toFixed(1));
+    if (consistencyScore > 100) consistencyScore = 100;
+  }
+
+  res.json({
+    paceRecent,
+    paceAllTime,
+    linesRemaining6Month,
+    linesRemainingFull,
+    weeksTo6MonthGoal,
+    weeksToFullQuran,
+    projectedDate6Month,
+    projectedDateFull,
+    trend,
+    consistencyScore,
   });
 });
 

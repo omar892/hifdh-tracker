@@ -1,6 +1,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useGetDashboard } from "@workspace/api-client-react";
 import {
   LayoutDashboard,
   Users,
@@ -15,6 +16,41 @@ import { motion } from "framer-motion";
 interface AppLayoutProps {
   children: ReactNode;
   title?: string;
+}
+
+function SidebarWeekSummary() {
+  const { data: dashboard } = useGetDashboard();
+  if (!dashboard || dashboard.length === 0) return null;
+  const done = dashboard.filter((s) => s.thisWeekDone).length;
+  const total = dashboard.length;
+  const pct = Math.round((done / total) * 100);
+  const allDone = done === total;
+  return (
+    <div className={`mx-4 mb-3 p-3 rounded-xl border text-sm ${
+      allDone
+        ? "bg-emerald-500/10 border-emerald-500/20"
+        : "bg-amber-500/10 border-amber-500/20"
+    }`}>
+      <p className={`text-[10px] font-extrabold uppercase tracking-widest mb-1.5 ${
+        allDone ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+      }`}>
+        This Week
+      </p>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${allDone ? "bg-emerald-500" : "bg-amber-500"}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className={`text-xs font-extrabold whitespace-nowrap ${
+          allDone ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+        }`}>
+          {done}/{total}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 export function AppLayout({ children, title }: AppLayoutProps) {
@@ -48,15 +84,19 @@ export function AppLayout({ children, title }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row w-full overflow-hidden">
-      <aside className="hidden md:flex flex-col w-64 bg-card border-r border-border/50 shadow-sm z-20 shrink-0">
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex flex-col w-64 bg-card border-r border-border/50 z-20 shrink-0">
         <div className="p-6 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25">
-            <BookOpen className="text-primary-foreground w-6 h-6" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+            <BookOpen className="text-white w-5 h-5" />
           </div>
-          <span className="font-display font-bold text-xl text-foreground">Hifdh Tracker</span>
+          <div>
+            <span className="font-display font-extrabold text-lg text-foreground tracking-tight block leading-none">Hifdh</span>
+            <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Tracker</span>
+          </div>
         </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav className="flex-1 px-3 py-4 space-y-0.5">
           {navItems.map((item) => {
             const isActive =
               location === item.href ||
@@ -64,66 +104,73 @@ export function AppLayout({ children, title }: AppLayoutProps) {
             return (
               <Link key={item.href} href={item.href} className="block">
                 <div
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${
                     isActive
-                      ? "bg-primary/10 text-primary font-semibold"
-                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                      ? "bg-primary text-primary-foreground font-bold shadow-md shadow-primary/20"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground font-medium"
                   }`}
                 >
-                  <item.icon className={`w-5 h-5 ${isActive ? "text-primary" : ""}`} />
-                  {item.label}
+                  <item.icon className="w-[18px] h-[18px]" />
+                  <span className="text-sm">{item.label}</span>
                 </div>
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-border/50 space-y-2">
-          <button
-            onClick={() => setIsDark((d) => !d)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
-          >
-            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            {isDark ? "Light Mode" : "Dark Mode"}
-          </button>
-          <button
-            onClick={() => logout()}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-destructive hover:bg-destructive/10 transition-all"
-          >
-            <LogOut className="w-5 h-5" />
-            Sign Out
-          </button>
+        <div className="border-t border-border/50">
+          <SidebarWeekSummary />
+          <div className="p-3 pt-1 space-y-0.5">
+            <button
+              onClick={() => setIsDark((d) => !d)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground transition-all text-sm font-medium"
+            >
+              {isDark ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
+              {isDark ? "Light Mode" : "Dark Mode"}
+            </button>
+            <button
+              onClick={() => logout().catch(() => {})}
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive transition-all text-sm font-medium"
+            >
+              <LogOut className="w-[18px] h-[18px]" />
+              Sign Out
+            </button>
+          </div>
         </div>
       </aside>
 
       <main className="flex-1 flex flex-col min-h-screen overflow-hidden relative">
-        <header className="md:hidden flex items-center justify-between p-4 bg-card border-b border-border/50 z-20 shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <BookOpen className="text-primary-foreground w-5 h-5" />
+        {/* Mobile header */}
+        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-card/80 backdrop-blur-lg border-b border-border/30 z-20 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-sm shadow-emerald-500/30">
+              <BookOpen className="text-white w-4 h-4" />
             </div>
-            <span className="font-display font-bold text-lg">{title || "Hifdh Tracker"}</span>
+            <span className="font-display font-extrabold text-base tracking-tight">{title || "Hifdh Tracker"}</span>
           </div>
           <button
+            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
             onClick={() => setIsDark((d) => !d)}
             className="p-2 rounded-full bg-secondary text-foreground"
           >
-            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 pb-28 md:pb-8">
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            key={location}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.2 }}
             className="max-w-6xl mx-auto"
           >
             {children}
           </motion.div>
         </div>
 
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border/50 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-50 px-6 py-3">
+        {/* Mobile bottom nav */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card/80 backdrop-blur-lg border-t border-border/30 z-50 px-4 py-1.5">
           <div className="flex justify-around items-center max-w-sm mx-auto">
             {navItems.map((item) => {
               const isActive =
@@ -131,17 +178,17 @@ export function AppLayout({ children, title }: AppLayoutProps) {
                 (item.href !== "/" && location.startsWith(item.href));
               return (
                 <Link key={item.href} href={item.href} className="block">
-                  <div className="flex flex-col items-center gap-1 p-2">
+                  <div className="flex flex-col items-center gap-0.5 min-h-[52px] justify-center px-4">
                     <div
-                      className={`p-2 rounded-full transition-all ${
-                        isActive ? "bg-primary/10 text-primary" : "text-muted-foreground"
+                      className={`p-1 rounded-full transition-all ${
+                        isActive ? "text-primary" : "text-muted-foreground"
                       }`}
                     >
-                      <item.icon className="w-6 h-6" />
+                      <item.icon className={`w-6 h-6 ${isActive ? "stroke-[2.5px]" : ""}`} />
                     </div>
                     <span
-                      className={`text-[10px] font-medium ${
-                        isActive ? "text-primary" : "text-muted-foreground"
+                      className={`text-[10px] leading-none ${
+                        isActive ? "text-primary font-extrabold" : "text-muted-foreground font-semibold"
                       }`}
                     >
                       {item.label}

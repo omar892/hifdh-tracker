@@ -9,18 +9,26 @@ export const weeklyEntriesTable = pgTable("weekly_entries", {
   weekStartDate: date("week_start_date").notNull(),
   weekEndDate: date("week_end_date").notNull(),
 
-  newMemFromSurah: integer("new_mem_from_surah"),
-  newMemFromAyah: integer("new_mem_from_ayah"),
-  newMemToSurah: integer("new_mem_to_surah"),
-  newMemToAyah: integer("new_mem_to_ayah"),
-  ayahsMemorized: integer("ayahs_memorized").notNull().default(0),
+  memorizationLines: integer("memorization_lines").notNull().default(0),
+  currentPage: integer("current_page"),
+  currentLine: integer("current_line"),
 
+  // Daily pass/fail arrays (JSON text: [true,true,false,true,true])
+  dailySabaq: text("daily_sabaq"),
+  dailyRmv: text("daily_rmv"),
+  dailyReview: text("daily_review"),
+  dailyAbsent: text("daily_absent"),
+
+  // Computed on save from daily arrays
   successfulDays: integer("successful_days").notNull().default(0),
   daysAttended: integer("days_attended").notNull().default(5),
+  weeklyPoints: integer("weekly_points").notNull().default(0),
 
+  rmvAmount: text("rmv_amount"),
+  reviewAmount: text("review_amount"),
+  rmvScore: integer("rmv_score"),
+  reviewScore: integer("review_score"),
   weekRating: text("week_rating"),
-  rmvQuality: text("rmv_quality"),
-  reviewQuality: text("review_quality"),
 
   teacherNotes: text("teacher_notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

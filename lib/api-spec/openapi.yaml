@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.2.0
+  version: 0.3.0
   description: Quran Hifdh Tracker API
 servers:
   - url: /api
@@ -271,6 +271,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/WeeklyEntry"
 
+  /students/{studentId}/projections:
+    get:
+      operationId: getStudentProjections
+      tags: [stats]
+      summary: Get pace projections for a student
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Student projections
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentProjections"
+
   /students/{studentId}/stats:
     get:
       operationId: getStudentStats
@@ -397,16 +416,24 @@ components:
 
     Student:
       type: object
-      required: [id, name, currentSurah, currentAyah, startDate, active, createdAt]
+      required: [id, name, currentPage, currentLine, startDate, active, createdAt, completedJuz]
       properties:
         id:
           type: integer
         name:
           type: string
-        currentSurah:
+        gender:
+          type: string
+          nullable: true
+          enum: [male, female]
+        currentPage:
           type: integer
-        currentAyah:
+          minimum: 1
+          maximum: 604
+        currentLine:
           type: integer
+          minimum: 1
+          maximum: 15
         startDate:
           type: string
         notes:
@@ -416,32 +443,56 @@ components:
           type: boolean
         createdAt:
           type: string
+        completedJuz:
+          type: array
+          items:
+            type: integer
 
     CreateStudentRequest:
       type: object
-      required: [name, currentSurah, currentAyah, startDate]
+      required: [name, currentPage, currentLine, startDate, completedJuz]
       properties:
         name:
           type: string
-        currentSurah:
+        gender:
+          type: string
+          nullable: true
+          enum: [male, female]
+        currentPage:
           type: integer
-        currentAyah:
+          minimum: 1
+          maximum: 604
+        currentLine:
           type: integer
+          minimum: 1
+          maximum: 15
         startDate:
           type: string
         notes:
           type: string
           nullable: true
+        completedJuz:
+          type: array
+          items:
+            type: integer
 
     UpdateStudentRequest:
       type: object
       properties:
         name:
           type: string
-        currentSurah:
+        gender:
+          type: string
+          nullable: true
+          enum: [male, female]
+        currentPage:
           type: integer
-        currentAyah:
+          minimum: 1
+          maximum: 604
+        currentLine:
           type: integer
+          minimum: 1
+          maximum: 15
         startDate:
           type: string
         notes:
@@ -449,18 +500,25 @@ components:
           nullable: true
         active:
           type: boolean
+        completedJuz:
+          type: array
+          items:
+            type: integer
 
     WeekRating:
       type: string
       enum: [excellent, strong, steady, needs_improvement, difficult_week]
 
-    Quality:
-      type: string
-      enum: [excellent, good, needs_repeat, incomplete]
+    BoolArray5:
+      type: array
+      items:
+        type: boolean
+      minItems: 5
+      maxItems: 5
 
     WeeklyEntry:
       type: object
-      required: [id, studentId, weekStartDate, weekEndDate, ayahsMemorized, successfulDays, daysAttended, createdAt, updatedAt]
+      required: [id, studentId, weekStartDate, weekEndDate, memorizationLines, successfulDays, daysAttended, weeklyPoints, createdAt, updatedAt]
       properties:
         id:
           type: integer
@@ -470,32 +528,40 @@ components:
           type: string
         weekEndDate:
           type: string
-        newMemFromSurah:
+        memorizationLines:
+          type: integer
+        currentPage:
           type: integer
           nullable: true
-        newMemFromAyah:
+        currentLine:
           type: integer
           nullable: true
-        newMemToSurah:
-          type: integer
+        dailySabaq:
+          $ref: "#/components/schemas/BoolArray5"
           nullable: true
-        newMemToAyah:
-          type: integer
+        dailyRmv:
+          $ref: "#/components/schemas/BoolArray5"
           nullable: true
-        ayahsMemorized:
-          type: integer
+        dailyReview:
+          $ref: "#/components/schemas/BoolArray5"
+          nullable: true
+        dailyAbsent:
+          $ref: "#/components/schemas/BoolArray5"
+          nullable: true
         successfulDays:
           type: integer
         daysAttended:
           type: integer
+        weeklyPoints:
+          type: integer
+        rmvAmount:
+          type: string
+          nullable: true
+        reviewAmount:
+          type: string
+          nullable: true
         weekRating:
           $ref: "#/components/schemas/WeekRating"
-          nullable: true
-        rmvQuality:
-          $ref: "#/components/schemas/Quality"
-          nullable: true
-        reviewQuality:
-          $ref: "#/components/schemas/Quality"
           nullable: true
         teacherNotes:
           type: string
@@ -507,46 +573,81 @@ components:
 
     UpsertWeeklyEntryRequest:
       type: object
-      required: [successfulDays, daysAttended]
+      required: [dailySabaq, dailyRmv, dailyReview, dailyAbsent]
       properties:
-        newMemFromSurah:
-          type: integer
-          nullable: true
-        newMemFromAyah:
-          type: integer
-          nullable: true
-        newMemToSurah:
-          type: integer
-          nullable: true
-        newMemToAyah:
-          type: integer
-          nullable: true
-        successfulDays:
+        memorizationLines:
           type: integer
           minimum: 0
-          maximum: 5
-        daysAttended:
+        currentPage:
           type: integer
-          minimum: 0
-          maximum: 5
+          nullable: true
+          minimum: 1
+          maximum: 604
+        currentLine:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 15
+        dailySabaq:
+          $ref: "#/components/schemas/BoolArray5"
+        dailyRmv:
+          $ref: "#/components/schemas/BoolArray5"
+        dailyReview:
+          $ref: "#/components/schemas/BoolArray5"
+        dailyAbsent:
+          $ref: "#/components/schemas/BoolArray5"
+        rmvAmount:
+          type: string
+          nullable: true
+        reviewAmount:
+          type: string
+          nullable: true
         weekRating:
           $ref: "#/components/schemas/WeekRating"
-          nullable: true
-        rmvQuality:
-          $ref: "#/components/schemas/Quality"
-          nullable: true
-        reviewQuality:
-          $ref: "#/components/schemas/Quality"
           nullable: true
         teacherNotes:
           type: string
           nullable: true
 
+    StudentProjections:
+      type: object
+      required: [paceRecent, paceAllTime, linesRemaining6Month, linesRemainingFull, weeksTo6MonthGoal, weeksToFullQuran, trend, consistencyScore]
+      properties:
+        paceRecent:
+          type: number
+          description: Average lines/week over last 8 weeks
+        paceAllTime:
+          type: number
+          description: Average lines/week over all time
+        linesRemaining6Month:
+          type: integer
+          description: Lines to reach half Quran
+        linesRemainingFull:
+          type: integer
+          description: Lines to complete full Quran
+        weeksTo6MonthGoal:
+          type: integer
+          nullable: true
+        weeksToFullQuran:
+          type: integer
+          nullable: true
+        projectedDate6Month:
+          type: string
+          nullable: true
+        projectedDateFull:
+          type: string
+          nullable: true
+        trend:
+          type: string
+          enum: [improving, declining, stable]
+        consistencyScore:
+          type: number
+
     StudentStats:
       type: object
-      required: [totalAyahsMemorized, totalQuranPercentage, juzCompleted, overallSuccessRate, currentStreakWeeks, ayahsThisMonth, ayahsLastMonth]
+      required: [totalLinesMemorized, totalQuranPercentage, juzCompleted, overallSuccessRate, currentStreakWeeks, linesThisMonth, linesLastMonth]
       properties:
-        totalAyahsMemorized:
+        totalLinesMemorized:
           type: integer
         totalQuranPercentage:
           type: number
@@ -556,9 +657,9 @@ components:
           type: number
         currentStreakWeeks:
           type: integer
-        ayahsThisMonth:
+        linesThisMonth:
           type: integer
-        ayahsLastMonth:
+        linesLastMonth:
           type: integer
 
     CalendarWeek:
@@ -578,7 +679,10 @@ components:
         daysAttended:
           type: integer
           nullable: true
-        ayahsMemorized:
+        linesMemorized:
+          type: integer
+          nullable: true
+        weeklyPoints:
           type: integer
           nullable: true
         hasEntry:
@@ -586,7 +690,7 @@ components:
 
     StudentCalendar:
       type: object
-      required: [month, weeks, totalAyahs, avgSuccessfulDays, excellentWeeks]
+      required: [month, weeks, totalLines, avgSuccessfulDays, excellentWeeks]
       properties:
         month:
           type: string
@@ -594,7 +698,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CalendarWeek"
-        totalAyahs:
+        totalLines:
           type: integer
         avgSuccessfulDays:
           type: number
@@ -603,15 +707,19 @@ components:
 
     DashboardStudent:
       type: object
-      required: [id, name, currentSurah, currentAyah, active, thisWeekDone]
+      required: [id, name, currentPage, currentLine, active, thisWeekDone, completedJuz]
       properties:
         id:
           type: integer
         name:
           type: string
-        currentSurah:
+        gender:
+          type: string
+          nullable: true
+          enum: [male, female]
+        currentPage:
           type: integer
-        currentAyah:
+        currentLine:
           type: integer
         active:
           type: boolean
@@ -620,18 +728,22 @@ components:
         thisWeekEntry:
           $ref: "#/components/schemas/WeeklyEntry"
           nullable: true
+        completedJuz:
+          type: array
+          items:
+            type: integer
 
     ClassStats:
       type: object
-      required: [totalStudents, averageSuccessRate, totalAyahsMemorized, avgAyahsPerWeek, topPerformers, needsAttention]
+      required: [totalStudents, averageSuccessRate, totalLinesMemorized, avgLinesPerWeek, topPerformers, needsAttention, studentProgress, studentRankings, attentionFlags, weeklyTrends, streakLeaderboard, linesThisMonth, linesLastMonth, activeStudentsThisMonth, activeStudentsLastMonth, avgLinesPerStudentThisMonth, avgLinesPerStudentLastMonth, spotlights, monthlyDecomposition, ratingDistributions, thisWeekSummary, absentStudents]
       properties:
         totalStudents:
           type: integer
         averageSuccessRate:
           type: number
-        totalAyahsMemorized:
+        totalLinesMemorized:
           type: integer
-        avgAyahsPerWeek:
+        avgLinesPerWeek:
           type: number
         topPerformers:
           type: array
@@ -641,6 +753,54 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/StudentPerformance"
+        studentProgress:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudentProgress"
+        studentRankings:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudentRanking"
+        attentionFlags:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudentAttention"
+        weeklyTrends:
+          type: array
+          items:
+            $ref: "#/components/schemas/WeekTrend"
+        streakLeaderboard:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudentStreak"
+        linesThisMonth:
+          type: integer
+        linesLastMonth:
+          type: integer
+        activeStudentsThisMonth:
+          type: integer
+        activeStudentsLastMonth:
+          type: integer
+        avgLinesPerStudentThisMonth:
+          type: number
+        avgLinesPerStudentLastMonth:
+          type: number
+        spotlights:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudentSpotlight"
+        monthlyDecomposition:
+          $ref: "#/components/schemas/MonthlyDecomposition"
+        ratingDistributions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RatingDistributionWeek"
+        thisWeekSummary:
+          $ref: "#/components/schemas/ThisWeekSummary"
+        absentStudents:
+          type: array
+          items:
+            $ref: "#/components/schemas/AbsentStudent"
 
     StudentPerformance:
       type: object
@@ -652,6 +812,86 @@ components:
           type: string
         successRate:
           type: number
+
+    StudentProgress:
+      type: object
+      required: [studentId, name, totalLines, totalJuz, weeklyPace]
+      properties:
+        studentId:
+          type: integer
+        name:
+          type: string
+        totalLines:
+          type: integer
+        totalJuz:
+          type: number
+        weeklyPace:
+          type: number
+
+    StudentRanking:
+      type: object
+      required: [studentId, name, compositeScore, successRate, weeklyPace, consistency]
+      properties:
+        studentId:
+          type: integer
+        name:
+          type: string
+        compositeScore:
+          type: number
+        successRate:
+          type: number
+        weeklyPace:
+          type: number
+        consistency:
+          type: number
+
+    AttentionFlag:
+      type: object
+      required: [type, label]
+      properties:
+        type:
+          type: string
+        label:
+          type: string
+
+    StudentAttention:
+      type: object
+      required: [studentId, name, flags]
+      properties:
+        studentId:
+          type: integer
+        name:
+          type: string
+        flags:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttentionFlag"
+
+    WeekTrend:
+      type: object
+      required: [weekStart, avgSuccessRate, totalLines, avgRating]
+      properties:
+        weekStart:
+          type: string
+        avgSuccessRate:
+          type: number
+        totalLines:
+          type: integer
+        avgRating:
+          type: number
+
+    StudentStreak:
+      type: object
+      required: [studentId, name, currentStreak, best12WeekStreak]
+      properties:
+        studentId:
+          type: integer
+        name:
+          type: string
+        currentStreak:
+          type: integer
+        best12WeekStreak:
+          type: integer
 
     Surah:
       type: object
@@ -666,4 +906,92 @@ components:
         ayahCount:
           type: integer
         juz:
+          type: integer
+
+    StudentSpotlight:
+      type: object
+      required: [studentId, name, insightText, type, category]
+      properties:
+        studentId:
+          type: integer
+        name:
+          type: string
+        insightText:
+          type: string
+        type:
+          type: string
+          enum: [big_increase, first_excellent, personal_record, milestone_page, perfect_streak, big_drop, streak_break, rating_drop]
+        category:
+          type: string
+          enum: [positive, concern]
+
+    MonthlyContributor:
+      type: object
+      required: [studentId, name, linesDelta]
+      properties:
+        studentId:
+          type: integer
+        name:
+          type: string
+        linesDelta:
+          type: integer
+
+    MonthlyDecomposition:
+      type: object
+      required: [schoolDaysThisMonth, schoolDaysLastMonth, linesPerSchoolDayThisMonth, linesPerSchoolDayLastMonth, biggestContributors]
+      properties:
+        schoolDaysThisMonth:
+          type: integer
+        schoolDaysLastMonth:
+          type: integer
+        linesPerSchoolDayThisMonth:
+          type: number
+        linesPerSchoolDayLastMonth:
+          type: number
+        biggestContributors:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlyContributor"
+
+    RatingDistributionWeek:
+      type: object
+      required: [weekStart, counts]
+      properties:
+        weekStart:
+          type: string
+        counts:
+          type: object
+          required: [excellent, strong, steady, needs_improvement, difficult_week]
+          properties:
+            excellent:
+              type: integer
+            strong:
+              type: integer
+            steady:
+              type: integer
+            needs_improvement:
+              type: integer
+            difficult_week:
+              type: integer
+
+    ThisWeekSummary:
+      type: object
+      required: [totalClassLines, avgLinesPerStudent, bestWeekLinesThisMonth]
+      properties:
+        totalClassLines:
+          type: integer
+        avgLinesPerStudent:
+          type: number
+        bestWeekLinesThisMonth:
+          type: integer
+
+    AbsentStudent:
+      type: object
+      required: [studentId, name, daysAttended]
+      properties:
+        studentId:
+          type: integer
+        name:
+          type: string
+        daysAttended:
           type: integer

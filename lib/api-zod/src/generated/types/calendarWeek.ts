@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 import type { WeekRating } from "./weekRating";
 
@@ -13,6 +13,7 @@ export interface CalendarWeek {
   weekRating?: WeekRating | null;
   successfulDays?: number | null;
   daysAttended?: number | null;
-  ayahsMemorized?: number | null;
+  linesMemorized?: number | null;
+  weeklyPoints?: number | null;
   hasEntry: boolean;
 }

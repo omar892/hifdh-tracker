@@ -3,14 +3,14 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 import type { CalendarWeek } from "./calendarWeek";
 
 export interface StudentCalendar {
   month: string;
   weeks: CalendarWeek[];
-  totalAyahs: number;
+  totalLines: number;
   avgSuccessfulDays: number;
   excellentWeeks: number;
 }

@@ -3,15 +3,41 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
+import type { AbsentStudent } from "./absentStudent";
+import type { MonthlyDecomposition } from "./monthlyDecomposition";
+import type { RatingDistributionWeek } from "./ratingDistributionWeek";
+import type { StudentAttention } from "./studentAttention";
 import type { StudentPerformance } from "./studentPerformance";
+import type { StudentProgress } from "./studentProgress";
+import type { StudentRanking } from "./studentRanking";
+import type { StudentSpotlight } from "./studentSpotlight";
+import type { StudentStreak } from "./studentStreak";
+import type { ThisWeekSummary } from "./thisWeekSummary";
+import type { WeekTrend } from "./weekTrend";
 
 export interface ClassStats {
   totalStudents: number;
   averageSuccessRate: number;
-  totalAyahsMemorized: number;
-  avgAyahsPerWeek: number;
+  totalLinesMemorized: number;
+  avgLinesPerWeek: number;
   topPerformers: StudentPerformance[];
   needsAttention: StudentPerformance[];
+  studentProgress: StudentProgress[];
+  studentRankings: StudentRanking[];
+  attentionFlags: StudentAttention[];
+  weeklyTrends: WeekTrend[];
+  streakLeaderboard: StudentStreak[];
+  linesThisMonth: number;
+  linesLastMonth: number;
+  activeStudentsThisMonth: number;
+  activeStudentsLastMonth: number;
+  avgLinesPerStudentThisMonth: number;
+  avgLinesPerStudentLastMonth: number;
+  spotlights: StudentSpotlight[];
+  monthlyDecomposition: MonthlyDecomposition;
+  ratingDistributions: RatingDistributionWeek[];
+  thisWeekSummary: ThisWeekSummary;
+  absentStudents: AbsentStudent[];
 }

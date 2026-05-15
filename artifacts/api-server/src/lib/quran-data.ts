@@ -125,6 +125,39 @@ export const SURAHS: SurahData[] = [
 
 export const TOTAL_QURAN_AYAHS = 6236;
 
+export const LINES_PER_PAGE = 15;
+export const TOTAL_PAGES = 604;
+export const TOTAL_LINES = LINES_PER_PAGE * TOTAL_PAGES; // 9060
+
+// Starting page for each juz (1-indexed)
+export const JUZ_START_PAGES: number[] = [
+  1, 22, 42, 62, 82, 102, 121, 142, 162, 182,
+  201, 222, 242, 262, 282, 302, 322, 342, 362, 382,
+  402, 422, 442, 462, 482, 502, 522, 542, 562, 582,
+];
+
+export function getJuzForPage(page: number): number {
+  for (let i = JUZ_START_PAGES.length - 1; i >= 0; i--) {
+    if (page >= JUZ_START_PAGES[i]) return i + 1;
+  }
+  return 1;
+}
+
+export function getPageProgress(page: number, line: number): number {
+  return (page - 1) * LINES_PER_PAGE + line;
+}
+
+/** Calculate total lines memorized from a list of completed juz numbers */
+export function getLinesForCompletedJuz(juzNumbers: number[]): number {
+  let total = 0;
+  for (const juz of juzNumbers) {
+    const startPage = JUZ_START_PAGES[juz - 1];
+    const endPage = juz < 30 ? JUZ_START_PAGES[juz] - 1 : TOTAL_PAGES;
+    total += (endPage - startPage + 1) * LINES_PER_PAGE;
+  }
+  return total;
+}
+
 export const JUZ_BOUNDARIES: { juz: number; startSurah: number; startAyah: number }[] = [
   { juz: 1, startSurah: 1, startAyah: 1 },
   { juz: 2, startSurah: 2, startAyah: 142 },
@@ -177,6 +210,37 @@ export function calculateJuzFromPosition(surah: number, ayah: number): number {
     }
   }
   return juz;
+}
+
+export function getJuzEndPosition(juz: number): { surah: number; ayah: number } {
+  if (juz >= 30) {
+    return { surah: 114, ayah: SURAHS[113].ayahCount };
+  }
+  const nextBoundary = JUZ_BOUNDARIES[juz]; // juz is 1-indexed, so JUZ_BOUNDARIES[juz] = start of juz+1
+  const startOfNext = calculateAyahsUpTo(nextBoundary.startSurah, nextBoundary.startAyah);
+  // End of current juz is 1 position before start of next
+  let total = startOfNext - 1;
+  let surah = 0;
+  for (let i = 0; i < SURAHS.length; i++) {
+    if (total <= SURAHS[i].ayahCount) {
+      surah = SURAHS[i].number;
+      return { surah, ayah: total };
+    }
+    total -= SURAHS[i].ayahCount;
+  }
+  return { surah: 114, ayah: SURAHS[113].ayahCount };
+}
+
+export function calculateAyahsInJuz(juzNumbers: number[]): number {
+  let total = 0;
+  for (const juz of juzNumbers) {
+    const start = JUZ_BOUNDARIES[juz - 1]; // 0-indexed array
+    const startPos = calculateAyahsUpTo(start.startSurah, start.startAyah);
+    const end = getJuzEndPosition(juz);
+    const endPos = calculateAyahsUpTo(end.surah, end.ayah);
+    total += endPos - startPos + 1;
+  }
+  return total;
 }
 
 export function calculateAyahsBetween(

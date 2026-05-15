@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 export interface HealthStatus {
   status: string;
@@ -25,32 +25,89 @@ export interface AuthResponse {
   authenticated: boolean;
 }
 
+export type StudentGender =
+  | (typeof StudentGender)[keyof typeof StudentGender]
+  | null;
+
+export const StudentGender = {
+  male: "male",
+  female: "female",
+} as const;
+
 export interface Student {
   id: number;
   name: string;
-  currentSurah: number;
-  currentAyah: number;
+  gender?: StudentGender;
+  /**
+   * @minimum 1
+   * @maximum 604
+   */
+  currentPage: number;
+  /**
+   * @minimum 1
+   * @maximum 15
+   */
+  currentLine: number;
   startDate: string;
   notes?: string | null;
   active: boolean;
   createdAt: string;
+  completedJuz: number[];
 }
+
+export type CreateStudentRequestGender =
+  | (typeof CreateStudentRequestGender)[keyof typeof CreateStudentRequestGender]
+  | null;
+
+export const CreateStudentRequestGender = {
+  male: "male",
+  female: "female",
+} as const;
 
 export interface CreateStudentRequest {
   name: string;
-  currentSurah: number;
-  currentAyah: number;
+  gender?: CreateStudentRequestGender;
+  /**
+   * @minimum 1
+   * @maximum 604
+   */
+  currentPage: number;
+  /**
+   * @minimum 1
+   * @maximum 15
+   */
+  currentLine: number;
   startDate: string;
   notes?: string | null;
+  completedJuz: number[];
 }
+
+export type UpdateStudentRequestGender =
+  | (typeof UpdateStudentRequestGender)[keyof typeof UpdateStudentRequestGender]
+  | null;
+
+export const UpdateStudentRequestGender = {
+  male: "male",
+  female: "female",
+} as const;
 
 export interface UpdateStudentRequest {
   name?: string;
-  currentSurah?: number;
-  currentAyah?: number;
+  gender?: UpdateStudentRequestGender;
+  /**
+   * @minimum 1
+   * @maximum 604
+   */
+  currentPage?: number;
+  /**
+   * @minimum 1
+   * @maximum 15
+   */
+  currentLine?: number;
   startDate?: string;
   notes?: string | null;
   active?: boolean;
+  completedJuz?: number[];
 }
 
 export type WeekRating = (typeof WeekRating)[keyof typeof WeekRating];
@@ -63,64 +120,92 @@ export const WeekRating = {
   difficult_week: "difficult_week",
 } as const;
 
-export type Quality = (typeof Quality)[keyof typeof Quality];
-
-export const Quality = {
-  excellent: "excellent",
-  good: "good",
-  needs_repeat: "needs_repeat",
-  incomplete: "incomplete",
-} as const;
+/**
+ * @minItems 5
+ * @maxItems 5
+ */
+export type BoolArray5 = boolean[];
 
 export interface WeeklyEntry {
   id: number;
   studentId: number;
   weekStartDate: string;
   weekEndDate: string;
-  newMemFromSurah?: number | null;
-  newMemFromAyah?: number | null;
-  newMemToSurah?: number | null;
-  newMemToAyah?: number | null;
-  ayahsMemorized: number;
+  memorizationLines: number;
+  currentPage?: number | null;
+  currentLine?: number | null;
+  dailySabaq?: BoolArray5 | null;
+  dailyRmv?: BoolArray5 | null;
+  dailyReview?: BoolArray5 | null;
+  dailyAbsent?: BoolArray5 | null;
   successfulDays: number;
   daysAttended: number;
+  weeklyPoints: number;
+  rmvAmount?: string | null;
+  reviewAmount?: string | null;
   weekRating?: WeekRating | null;
-  rmvQuality?: Quality | null;
-  reviewQuality?: Quality | null;
   teacherNotes?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface UpsertWeeklyEntryRequest {
-  newMemFromSurah?: number | null;
-  newMemFromAyah?: number | null;
-  newMemToSurah?: number | null;
-  newMemToAyah?: number | null;
+  /** @minimum 0 */
+  memorizationLines?: number;
   /**
-   * @minimum 0
-   * @maximum 5
+   * @minimum 1
+   * @maximum 604
    */
-  successfulDays: number;
+  currentPage?: number | null;
   /**
-   * @minimum 0
-   * @maximum 5
+   * @minimum 1
+   * @maximum 15
    */
-  daysAttended: number;
+  currentLine?: number | null;
+  dailySabaq: BoolArray5;
+  dailyRmv: BoolArray5;
+  dailyReview: BoolArray5;
+  dailyAbsent: BoolArray5;
+  rmvAmount?: string | null;
+  reviewAmount?: string | null;
   weekRating?: WeekRating | null;
-  rmvQuality?: Quality | null;
-  reviewQuality?: Quality | null;
   teacherNotes?: string | null;
 }
 
+export type StudentProjectionsTrend =
+  (typeof StudentProjectionsTrend)[keyof typeof StudentProjectionsTrend];
+
+export const StudentProjectionsTrend = {
+  improving: "improving",
+  declining: "declining",
+  stable: "stable",
+} as const;
+
+export interface StudentProjections {
+  /** Average lines/week over last 8 weeks */
+  paceRecent: number;
+  /** Average lines/week over all time */
+  paceAllTime: number;
+  /** Lines to reach half Quran */
+  linesRemaining6Month: number;
+  /** Lines to complete full Quran */
+  linesRemainingFull: number;
+  weeksTo6MonthGoal: number | null;
+  weeksToFullQuran: number | null;
+  projectedDate6Month?: string | null;
+  projectedDateFull?: string | null;
+  trend: StudentProjectionsTrend;
+  consistencyScore: number;
+}
+
 export interface StudentStats {
-  totalAyahsMemorized: number;
+  totalLinesMemorized: number;
   totalQuranPercentage: number;
   juzCompleted: number;
   overallSuccessRate: number;
   currentStreakWeeks: number;
-  ayahsThisMonth: number;
-  ayahsLastMonth: number;
+  linesThisMonth: number;
+  linesLastMonth: number;
 }
 
 export interface CalendarWeek {
@@ -129,26 +214,38 @@ export interface CalendarWeek {
   weekRating?: WeekRating | null;
   successfulDays?: number | null;
   daysAttended?: number | null;
-  ayahsMemorized?: number | null;
+  linesMemorized?: number | null;
+  weeklyPoints?: number | null;
   hasEntry: boolean;
 }
 
 export interface StudentCalendar {
   month: string;
   weeks: CalendarWeek[];
-  totalAyahs: number;
+  totalLines: number;
   avgSuccessfulDays: number;
   excellentWeeks: number;
 }
 
+export type DashboardStudentGender =
+  | (typeof DashboardStudentGender)[keyof typeof DashboardStudentGender]
+  | null;
+
+export const DashboardStudentGender = {
+  male: "male",
+  female: "female",
+} as const;
+
 export interface DashboardStudent {
   id: number;
   name: string;
-  currentSurah: number;
-  currentAyah: number;
+  gender?: DashboardStudentGender;
+  currentPage: number;
+  currentLine: number;
   active: boolean;
   thisWeekDone: boolean;
   thisWeekEntry?: WeeklyEntry | null;
+  completedJuz: number[];
 }
 
 export interface StudentPerformance {
@@ -157,13 +254,140 @@ export interface StudentPerformance {
   successRate: number;
 }
 
+export interface StudentProgress {
+  studentId: number;
+  name: string;
+  totalLines: number;
+  totalJuz: number;
+  weeklyPace: number;
+}
+
+export interface StudentRanking {
+  studentId: number;
+  name: string;
+  compositeScore: number;
+  successRate: number;
+  weeklyPace: number;
+  consistency: number;
+}
+
+export interface AttentionFlag {
+  type: string;
+  label: string;
+}
+
+export interface StudentAttention {
+  studentId: number;
+  name: string;
+  flags: AttentionFlag[];
+}
+
+export interface WeekTrend {
+  weekStart: string;
+  avgSuccessRate: number;
+  totalLines: number;
+  avgRating: number;
+}
+
+export interface StudentStreak {
+  studentId: number;
+  name: string;
+  currentStreak: number;
+  best12WeekStreak: number;
+}
+
+export type StudentSpotlightType =
+  (typeof StudentSpotlightType)[keyof typeof StudentSpotlightType];
+
+export const StudentSpotlightType = {
+  big_increase: "big_increase",
+  first_excellent: "first_excellent",
+  personal_record: "personal_record",
+  milestone_page: "milestone_page",
+  perfect_streak: "perfect_streak",
+  big_drop: "big_drop",
+  streak_break: "streak_break",
+  rating_drop: "rating_drop",
+} as const;
+
+export type StudentSpotlightCategory =
+  (typeof StudentSpotlightCategory)[keyof typeof StudentSpotlightCategory];
+
+export const StudentSpotlightCategory = {
+  positive: "positive",
+  concern: "concern",
+} as const;
+
+export interface StudentSpotlight {
+  studentId: number;
+  name: string;
+  insightText: string;
+  type: StudentSpotlightType;
+  category: StudentSpotlightCategory;
+}
+
+export interface MonthlyContributor {
+  studentId: number;
+  name: string;
+  linesDelta: number;
+}
+
+export interface MonthlyDecomposition {
+  schoolDaysThisMonth: number;
+  schoolDaysLastMonth: number;
+  linesPerSchoolDayThisMonth: number;
+  linesPerSchoolDayLastMonth: number;
+  biggestContributors: MonthlyContributor[];
+}
+
+export type RatingDistributionWeekCounts = {
+  excellent: number;
+  strong: number;
+  steady: number;
+  needs_improvement: number;
+  difficult_week: number;
+};
+
+export interface RatingDistributionWeek {
+  weekStart: string;
+  counts: RatingDistributionWeekCounts;
+}
+
+export interface ThisWeekSummary {
+  totalClassLines: number;
+  avgLinesPerStudent: number;
+  bestWeekLinesThisMonth: number;
+}
+
+export interface AbsentStudent {
+  studentId: number;
+  name: string;
+  daysAttended: number;
+}
+
 export interface ClassStats {
   totalStudents: number;
   averageSuccessRate: number;
-  totalAyahsMemorized: number;
-  avgAyahsPerWeek: number;
+  totalLinesMemorized: number;
+  avgLinesPerWeek: number;
   topPerformers: StudentPerformance[];
   needsAttention: StudentPerformance[];
+  studentProgress: StudentProgress[];
+  studentRankings: StudentRanking[];
+  attentionFlags: StudentAttention[];
+  weeklyTrends: WeekTrend[];
+  streakLeaderboard: StudentStreak[];
+  linesThisMonth: number;
+  linesLastMonth: number;
+  activeStudentsThisMonth: number;
+  activeStudentsLastMonth: number;
+  avgLinesPerStudentThisMonth: number;
+  avgLinesPerStudentLastMonth: number;
+  spotlights: StudentSpotlight[];
+  monthlyDecomposition: MonthlyDecomposition;
+  ratingDistributions: RatingDistributionWeek[];
+  thisWeekSummary: ThisWeekSummary;
+  absentStudents: AbsentStudent[];
 }
 
 export interface Surah {

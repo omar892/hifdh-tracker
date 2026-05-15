@@ -3,28 +3,30 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
-import type { Quality } from "./quality";
+import type { BoolArray5 } from "./boolArray5";
 import type { WeekRating } from "./weekRating";
 
 export interface UpsertWeeklyEntryRequest {
-  newMemFromSurah?: number | null;
-  newMemFromAyah?: number | null;
-  newMemToSurah?: number | null;
-  newMemToAyah?: number | null;
+  /** @minimum 0 */
+  memorizationLines?: number;
   /**
-   * @minimum 0
-   * @maximum 5
+   * @minimum 1
+   * @maximum 604
    */
-  successfulDays: number;
+  currentPage?: number | null;
   /**
-   * @minimum 0
-   * @maximum 5
+   * @minimum 1
+   * @maximum 15
    */
-  daysAttended: number;
+  currentLine?: number | null;
+  dailySabaq: BoolArray5;
+  dailyRmv: BoolArray5;
+  dailyReview: BoolArray5;
+  dailyAbsent: BoolArray5;
+  rmvAmount?: string | null;
+  reviewAmount?: string | null;
   weekRating?: WeekRating | null;
-  rmvQuality?: Quality | null;
-  reviewQuality?: Quality | null;
   teacherNotes?: string | null;
 }

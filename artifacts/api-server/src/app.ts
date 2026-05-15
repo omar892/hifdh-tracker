@@ -37,4 +37,16 @@ app.use(
 
 app.use("/api", router);
 
+// Global error handler
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("[API Error]", err);
+  if (err && typeof err === "object" && "issues" in err) {
+    // Zod validation error
+    res.status(400).json({ error: "Validation error", details: (err as { issues: unknown }).issues });
+    return;
+  }
+  const message = err instanceof Error ? err.message : "Internal server error";
+  res.status(500).json({ error: message });
+});
+
 export default app;

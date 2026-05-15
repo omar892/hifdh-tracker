@@ -5,8 +5,9 @@ import { z } from "zod/v4";
 export const studentsTable = pgTable("students", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  currentSurah: integer("current_surah").notNull().default(1),
-  currentAyah: integer("current_ayah").notNull().default(1),
+  gender: text("gender"),
+  currentPage: integer("current_page").notNull().default(1),
+  currentLine: integer("current_line").notNull().default(1),
   startDate: date("start_date").notNull(),
   notes: text("notes"),
   active: boolean("active").notNull().default(true),

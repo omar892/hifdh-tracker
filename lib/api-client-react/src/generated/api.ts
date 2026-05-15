@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
@@ -30,6 +30,7 @@ import type {
   MessageResponse,
   Student,
   StudentCalendar,
+  StudentProjections,
   StudentStats,
   Surah,
   UpdateStudentRequest,
@@ -1048,6 +1049,98 @@ export const useUpsertWeeklyEntry = <
 > => {
   return useMutation(getUpsertWeeklyEntryMutationOptions(options));
 };
+
+/**
+ * @summary Get pace projections for a student
+ */
+export const getGetStudentProjectionsUrl = (studentId: number) => {
+  return `/api/students/${studentId}/projections`;
+};
+
+export const getStudentProjections = async (
+  studentId: number,
+  options?: RequestInit,
+): Promise<StudentProjections> => {
+  return customFetch<StudentProjections>(
+    getGetStudentProjectionsUrl(studentId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetStudentProjectionsQueryKey = (studentId: number) => {
+  return [`/api/students/${studentId}/projections`] as const;
+};
+
+export const getGetStudentProjectionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getStudentProjections>>,
+  TError = ErrorType<unknown>,
+>(
+  studentId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStudentProjections>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetStudentProjectionsQueryKey(studentId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getStudentProjections>>
+  > = ({ signal }) =>
+    getStudentProjections(studentId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!studentId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getStudentProjections>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetStudentProjectionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getStudentProjections>>
+>;
+export type GetStudentProjectionsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get pace projections for a student
+ */
+
+export function useGetStudentProjections<
+  TData = Awaited<ReturnType<typeof getStudentProjections>>,
+  TError = ErrorType<unknown>,
+>(
+  studentId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStudentProjections>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetStudentProjectionsQueryOptions(studentId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get KPI stats for a student

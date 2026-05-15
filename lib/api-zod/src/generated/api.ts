@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 import * as zod from "zod";
 
@@ -46,27 +46,39 @@ export const ListStudentsQueryParams = zod.object({
   active: zod.coerce.boolean().optional(),
 });
 
+export const listStudentsResponseCurrentPageMax = 604;
+
+export const listStudentsResponseCurrentLineMax = 15;
+
 export const ListStudentsResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
-  currentSurah: zod.number(),
-  currentAyah: zod.number(),
+  gender: zod.enum(["male", "female"]).nullish(),
+  currentPage: zod.number().min(1).max(listStudentsResponseCurrentPageMax),
+  currentLine: zod.number().min(1).max(listStudentsResponseCurrentLineMax),
   startDate: zod.string(),
   notes: zod.string().nullish(),
   active: zod.boolean(),
   createdAt: zod.string(),
+  completedJuz: zod.array(zod.number()),
 });
 export const ListStudentsResponse = zod.array(ListStudentsResponseItem);
 
 /**
  * @summary Create a student
  */
+export const createStudentBodyCurrentPageMax = 604;
+
+export const createStudentBodyCurrentLineMax = 15;
+
 export const CreateStudentBody = zod.object({
   name: zod.string(),
-  currentSurah: zod.number(),
-  currentAyah: zod.number(),
+  gender: zod.enum(["male", "female"]).nullish(),
+  currentPage: zod.number().min(1).max(createStudentBodyCurrentPageMax),
+  currentLine: zod.number().min(1).max(createStudentBodyCurrentLineMax),
   startDate: zod.string(),
   notes: zod.string().nullish(),
+  completedJuz: zod.array(zod.number()),
 });
 
 /**
@@ -76,15 +88,21 @@ export const GetStudentParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const getStudentResponseCurrentPageMax = 604;
+
+export const getStudentResponseCurrentLineMax = 15;
+
 export const GetStudentResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
-  currentSurah: zod.number(),
-  currentAyah: zod.number(),
+  gender: zod.enum(["male", "female"]).nullish(),
+  currentPage: zod.number().min(1).max(getStudentResponseCurrentPageMax),
+  currentLine: zod.number().min(1).max(getStudentResponseCurrentLineMax),
   startDate: zod.string(),
   notes: zod.string().nullish(),
   active: zod.boolean(),
   createdAt: zod.string(),
+  completedJuz: zod.array(zod.number()),
 });
 
 /**
@@ -94,24 +112,44 @@ export const UpdateStudentParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const updateStudentBodyCurrentPageMax = 604;
+
+export const updateStudentBodyCurrentLineMax = 15;
+
 export const UpdateStudentBody = zod.object({
   name: zod.string().optional(),
-  currentSurah: zod.number().optional(),
-  currentAyah: zod.number().optional(),
+  gender: zod.enum(["male", "female"]).nullish(),
+  currentPage: zod
+    .number()
+    .min(1)
+    .max(updateStudentBodyCurrentPageMax)
+    .optional(),
+  currentLine: zod
+    .number()
+    .min(1)
+    .max(updateStudentBodyCurrentLineMax)
+    .optional(),
   startDate: zod.string().optional(),
   notes: zod.string().nullish(),
   active: zod.boolean().optional(),
+  completedJuz: zod.array(zod.number()).optional(),
 });
+
+export const updateStudentResponseCurrentPageMax = 604;
+
+export const updateStudentResponseCurrentLineMax = 15;
 
 export const UpdateStudentResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
-  currentSurah: zod.number(),
-  currentAyah: zod.number(),
+  gender: zod.enum(["male", "female"]).nullish(),
+  currentPage: zod.number().min(1).max(updateStudentResponseCurrentPageMax),
+  currentLine: zod.number().min(1).max(updateStudentResponseCurrentLineMax),
   startDate: zod.string(),
   notes: zod.string().nullish(),
   active: zod.boolean(),
   createdAt: zod.string(),
+  completedJuz: zod.array(zod.number()),
 });
 
 /**
@@ -130,18 +168,51 @@ export const ListWeeklyEntriesQueryParams = zod.object({
   offset: zod.coerce.number().default(listWeeklyEntriesQueryOffsetDefault),
 });
 
+export const listWeeklyEntriesResponseDailySabaqMin = 5;
+export const listWeeklyEntriesResponseDailySabaqMax = 5;
+
+export const listWeeklyEntriesResponseDailyRmvMin = 5;
+export const listWeeklyEntriesResponseDailyRmvMax = 5;
+
+export const listWeeklyEntriesResponseDailyReviewMin = 5;
+export const listWeeklyEntriesResponseDailyReviewMax = 5;
+
+export const listWeeklyEntriesResponseDailyAbsentMin = 5;
+export const listWeeklyEntriesResponseDailyAbsentMax = 5;
+
 export const ListWeeklyEntriesResponseItem = zod.object({
   id: zod.number(),
   studentId: zod.number(),
   weekStartDate: zod.string(),
   weekEndDate: zod.string(),
-  newMemFromSurah: zod.number().nullish(),
-  newMemFromAyah: zod.number().nullish(),
-  newMemToSurah: zod.number().nullish(),
-  newMemToAyah: zod.number().nullish(),
-  ayahsMemorized: zod.number(),
+  memorizationLines: zod.number(),
+  currentPage: zod.number().nullish(),
+  currentLine: zod.number().nullish(),
+  dailySabaq: zod
+    .array(zod.boolean())
+    .min(listWeeklyEntriesResponseDailySabaqMin)
+    .max(listWeeklyEntriesResponseDailySabaqMax)
+    .nullish(),
+  dailyRmv: zod
+    .array(zod.boolean())
+    .min(listWeeklyEntriesResponseDailyRmvMin)
+    .max(listWeeklyEntriesResponseDailyRmvMax)
+    .nullish(),
+  dailyReview: zod
+    .array(zod.boolean())
+    .min(listWeeklyEntriesResponseDailyReviewMin)
+    .max(listWeeklyEntriesResponseDailyReviewMax)
+    .nullish(),
+  dailyAbsent: zod
+    .array(zod.boolean())
+    .min(listWeeklyEntriesResponseDailyAbsentMin)
+    .max(listWeeklyEntriesResponseDailyAbsentMax)
+    .nullish(),
   successfulDays: zod.number(),
   daysAttended: zod.number(),
+  weeklyPoints: zod.number(),
+  rmvAmount: zod.string().nullish(),
+  reviewAmount: zod.string().nullish(),
   weekRating: zod
     .enum([
       "excellent",
@@ -150,12 +221,6 @@ export const ListWeeklyEntriesResponseItem = zod.object({
       "needs_improvement",
       "difficult_week",
     ])
-    .nullish(),
-  rmvQuality: zod
-    .enum(["excellent", "good", "needs_repeat", "incomplete"])
-    .nullish(),
-  reviewQuality: zod
-    .enum(["excellent", "good", "needs_repeat", "incomplete"])
     .nullish(),
   teacherNotes: zod.string().nullish(),
   createdAt: zod.string(),
@@ -173,18 +238,51 @@ export const GetWeeklyEntryParams = zod.object({
   weekStart: zod.coerce.string().describe("Monday date (YYYY-MM-DD)"),
 });
 
+export const getWeeklyEntryResponseDailySabaqMin = 5;
+export const getWeeklyEntryResponseDailySabaqMax = 5;
+
+export const getWeeklyEntryResponseDailyRmvMin = 5;
+export const getWeeklyEntryResponseDailyRmvMax = 5;
+
+export const getWeeklyEntryResponseDailyReviewMin = 5;
+export const getWeeklyEntryResponseDailyReviewMax = 5;
+
+export const getWeeklyEntryResponseDailyAbsentMin = 5;
+export const getWeeklyEntryResponseDailyAbsentMax = 5;
+
 export const GetWeeklyEntryResponse = zod.object({
   id: zod.number(),
   studentId: zod.number(),
   weekStartDate: zod.string(),
   weekEndDate: zod.string(),
-  newMemFromSurah: zod.number().nullish(),
-  newMemFromAyah: zod.number().nullish(),
-  newMemToSurah: zod.number().nullish(),
-  newMemToAyah: zod.number().nullish(),
-  ayahsMemorized: zod.number(),
+  memorizationLines: zod.number(),
+  currentPage: zod.number().nullish(),
+  currentLine: zod.number().nullish(),
+  dailySabaq: zod
+    .array(zod.boolean())
+    .min(getWeeklyEntryResponseDailySabaqMin)
+    .max(getWeeklyEntryResponseDailySabaqMax)
+    .nullish(),
+  dailyRmv: zod
+    .array(zod.boolean())
+    .min(getWeeklyEntryResponseDailyRmvMin)
+    .max(getWeeklyEntryResponseDailyRmvMax)
+    .nullish(),
+  dailyReview: zod
+    .array(zod.boolean())
+    .min(getWeeklyEntryResponseDailyReviewMin)
+    .max(getWeeklyEntryResponseDailyReviewMax)
+    .nullish(),
+  dailyAbsent: zod
+    .array(zod.boolean())
+    .min(getWeeklyEntryResponseDailyAbsentMin)
+    .max(getWeeklyEntryResponseDailyAbsentMax)
+    .nullish(),
   successfulDays: zod.number(),
   daysAttended: zod.number(),
+  weeklyPoints: zod.number(),
+  rmvAmount: zod.string().nullish(),
+  reviewAmount: zod.string().nullish(),
   weekRating: zod
     .enum([
       "excellent",
@@ -193,12 +291,6 @@ export const GetWeeklyEntryResponse = zod.object({
       "needs_improvement",
       "difficult_week",
     ])
-    .nullish(),
-  rmvQuality: zod
-    .enum(["excellent", "good", "needs_repeat", "incomplete"])
-    .nullish(),
-  reviewQuality: zod
-    .enum(["excellent", "good", "needs_repeat", "incomplete"])
     .nullish(),
   teacherNotes: zod.string().nullish(),
   createdAt: zod.string(),
@@ -213,25 +305,57 @@ export const UpsertWeeklyEntryParams = zod.object({
   weekStart: zod.coerce.string().describe("Monday date (YYYY-MM-DD)"),
 });
 
-export const upsertWeeklyEntryBodySuccessfulDaysMin = 0;
-export const upsertWeeklyEntryBodySuccessfulDaysMax = 5;
+export const upsertWeeklyEntryBodyMemorizationLinesMin = 0;
 
-export const upsertWeeklyEntryBodyDaysAttendedMin = 0;
-export const upsertWeeklyEntryBodyDaysAttendedMax = 5;
+export const upsertWeeklyEntryBodyCurrentPageMax = 604;
+
+export const upsertWeeklyEntryBodyCurrentLineMax = 15;
+
+export const upsertWeeklyEntryBodyDailySabaqMin = 5;
+export const upsertWeeklyEntryBodyDailySabaqMax = 5;
+
+export const upsertWeeklyEntryBodyDailyRmvMin = 5;
+export const upsertWeeklyEntryBodyDailyRmvMax = 5;
+
+export const upsertWeeklyEntryBodyDailyReviewMin = 5;
+export const upsertWeeklyEntryBodyDailyReviewMax = 5;
+
+export const upsertWeeklyEntryBodyDailyAbsentMin = 5;
+export const upsertWeeklyEntryBodyDailyAbsentMax = 5;
 
 export const UpsertWeeklyEntryBody = zod.object({
-  newMemFromSurah: zod.number().nullish(),
-  newMemFromAyah: zod.number().nullish(),
-  newMemToSurah: zod.number().nullish(),
-  newMemToAyah: zod.number().nullish(),
-  successfulDays: zod
+  memorizationLines: zod
     .number()
-    .min(upsertWeeklyEntryBodySuccessfulDaysMin)
-    .max(upsertWeeklyEntryBodySuccessfulDaysMax),
-  daysAttended: zod
+    .min(upsertWeeklyEntryBodyMemorizationLinesMin)
+    .optional(),
+  currentPage: zod
     .number()
-    .min(upsertWeeklyEntryBodyDaysAttendedMin)
-    .max(upsertWeeklyEntryBodyDaysAttendedMax),
+    .min(1)
+    .max(upsertWeeklyEntryBodyCurrentPageMax)
+    .nullish(),
+  currentLine: zod
+    .number()
+    .min(1)
+    .max(upsertWeeklyEntryBodyCurrentLineMax)
+    .nullish(),
+  dailySabaq: zod
+    .array(zod.boolean())
+    .min(upsertWeeklyEntryBodyDailySabaqMin)
+    .max(upsertWeeklyEntryBodyDailySabaqMax),
+  dailyRmv: zod
+    .array(zod.boolean())
+    .min(upsertWeeklyEntryBodyDailyRmvMin)
+    .max(upsertWeeklyEntryBodyDailyRmvMax),
+  dailyReview: zod
+    .array(zod.boolean())
+    .min(upsertWeeklyEntryBodyDailyReviewMin)
+    .max(upsertWeeklyEntryBodyDailyReviewMax),
+  dailyAbsent: zod
+    .array(zod.boolean())
+    .min(upsertWeeklyEntryBodyDailyAbsentMin)
+    .max(upsertWeeklyEntryBodyDailyAbsentMax),
+  rmvAmount: zod.string().nullish(),
+  reviewAmount: zod.string().nullish(),
   weekRating: zod
     .enum([
       "excellent",
@@ -241,27 +365,54 @@ export const UpsertWeeklyEntryBody = zod.object({
       "difficult_week",
     ])
     .nullish(),
-  rmvQuality: zod
-    .enum(["excellent", "good", "needs_repeat", "incomplete"])
-    .nullish(),
-  reviewQuality: zod
-    .enum(["excellent", "good", "needs_repeat", "incomplete"])
-    .nullish(),
   teacherNotes: zod.string().nullish(),
 });
+
+export const upsertWeeklyEntryResponseDailySabaqMin = 5;
+export const upsertWeeklyEntryResponseDailySabaqMax = 5;
+
+export const upsertWeeklyEntryResponseDailyRmvMin = 5;
+export const upsertWeeklyEntryResponseDailyRmvMax = 5;
+
+export const upsertWeeklyEntryResponseDailyReviewMin = 5;
+export const upsertWeeklyEntryResponseDailyReviewMax = 5;
+
+export const upsertWeeklyEntryResponseDailyAbsentMin = 5;
+export const upsertWeeklyEntryResponseDailyAbsentMax = 5;
 
 export const UpsertWeeklyEntryResponse = zod.object({
   id: zod.number(),
   studentId: zod.number(),
   weekStartDate: zod.string(),
   weekEndDate: zod.string(),
-  newMemFromSurah: zod.number().nullish(),
-  newMemFromAyah: zod.number().nullish(),
-  newMemToSurah: zod.number().nullish(),
-  newMemToAyah: zod.number().nullish(),
-  ayahsMemorized: zod.number(),
+  memorizationLines: zod.number(),
+  currentPage: zod.number().nullish(),
+  currentLine: zod.number().nullish(),
+  dailySabaq: zod
+    .array(zod.boolean())
+    .min(upsertWeeklyEntryResponseDailySabaqMin)
+    .max(upsertWeeklyEntryResponseDailySabaqMax)
+    .nullish(),
+  dailyRmv: zod
+    .array(zod.boolean())
+    .min(upsertWeeklyEntryResponseDailyRmvMin)
+    .max(upsertWeeklyEntryResponseDailyRmvMax)
+    .nullish(),
+  dailyReview: zod
+    .array(zod.boolean())
+    .min(upsertWeeklyEntryResponseDailyReviewMin)
+    .max(upsertWeeklyEntryResponseDailyReviewMax)
+    .nullish(),
+  dailyAbsent: zod
+    .array(zod.boolean())
+    .min(upsertWeeklyEntryResponseDailyAbsentMin)
+    .max(upsertWeeklyEntryResponseDailyAbsentMax)
+    .nullish(),
   successfulDays: zod.number(),
   daysAttended: zod.number(),
+  weeklyPoints: zod.number(),
+  rmvAmount: zod.string().nullish(),
+  reviewAmount: zod.string().nullish(),
   weekRating: zod
     .enum([
       "excellent",
@@ -271,15 +422,29 @@ export const UpsertWeeklyEntryResponse = zod.object({
       "difficult_week",
     ])
     .nullish(),
-  rmvQuality: zod
-    .enum(["excellent", "good", "needs_repeat", "incomplete"])
-    .nullish(),
-  reviewQuality: zod
-    .enum(["excellent", "good", "needs_repeat", "incomplete"])
-    .nullish(),
   teacherNotes: zod.string().nullish(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
+});
+
+/**
+ * @summary Get pace projections for a student
+ */
+export const GetStudentProjectionsParams = zod.object({
+  studentId: zod.coerce.number(),
+});
+
+export const GetStudentProjectionsResponse = zod.object({
+  paceRecent: zod.number().describe("Average lines\/week over last 8 weeks"),
+  paceAllTime: zod.number().describe("Average lines\/week over all time"),
+  linesRemaining6Month: zod.number().describe("Lines to reach half Quran"),
+  linesRemainingFull: zod.number().describe("Lines to complete full Quran"),
+  weeksTo6MonthGoal: zod.number().nullable(),
+  weeksToFullQuran: zod.number().nullable(),
+  projectedDate6Month: zod.string().nullish(),
+  projectedDateFull: zod.string().nullish(),
+  trend: zod.enum(["improving", "declining", "stable"]),
+  consistencyScore: zod.number(),
 });
 
 /**
@@ -290,13 +455,13 @@ export const GetStudentStatsParams = zod.object({
 });
 
 export const GetStudentStatsResponse = zod.object({
-  totalAyahsMemorized: zod.number(),
+  totalLinesMemorized: zod.number(),
   totalQuranPercentage: zod.number(),
   juzCompleted: zod.number(),
   overallSuccessRate: zod.number(),
   currentStreakWeeks: zod.number(),
-  ayahsThisMonth: zod.number(),
-  ayahsLastMonth: zod.number(),
+  linesThisMonth: zod.number(),
+  linesLastMonth: zod.number(),
 });
 
 /**
@@ -327,11 +492,12 @@ export const GetStudentCalendarResponse = zod.object({
         .nullish(),
       successfulDays: zod.number().nullish(),
       daysAttended: zod.number().nullish(),
-      ayahsMemorized: zod.number().nullish(),
+      linesMemorized: zod.number().nullish(),
+      weeklyPoints: zod.number().nullish(),
       hasEntry: zod.boolean(),
     }),
   ),
-  totalAyahs: zod.number(),
+  totalLines: zod.number(),
   avgSuccessfulDays: zod.number(),
   excellentWeeks: zod.number(),
 });
@@ -339,11 +505,24 @@ export const GetStudentCalendarResponse = zod.object({
 /**
  * @summary Get dashboard data for all active students
  */
+export const getDashboardResponseThisWeekEntryDailySabaqMin = 5;
+export const getDashboardResponseThisWeekEntryDailySabaqMax = 5;
+
+export const getDashboardResponseThisWeekEntryDailyRmvMin = 5;
+export const getDashboardResponseThisWeekEntryDailyRmvMax = 5;
+
+export const getDashboardResponseThisWeekEntryDailyReviewMin = 5;
+export const getDashboardResponseThisWeekEntryDailyReviewMax = 5;
+
+export const getDashboardResponseThisWeekEntryDailyAbsentMin = 5;
+export const getDashboardResponseThisWeekEntryDailyAbsentMax = 5;
+
 export const GetDashboardResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
-  currentSurah: zod.number(),
-  currentAyah: zod.number(),
+  gender: zod.enum(["male", "female"]).nullish(),
+  currentPage: zod.number(),
+  currentLine: zod.number(),
   active: zod.boolean(),
   thisWeekDone: zod.boolean(),
   thisWeekEntry: zod
@@ -352,13 +531,34 @@ export const GetDashboardResponseItem = zod.object({
       studentId: zod.number(),
       weekStartDate: zod.string(),
       weekEndDate: zod.string(),
-      newMemFromSurah: zod.number().nullish(),
-      newMemFromAyah: zod.number().nullish(),
-      newMemToSurah: zod.number().nullish(),
-      newMemToAyah: zod.number().nullish(),
-      ayahsMemorized: zod.number(),
+      memorizationLines: zod.number(),
+      currentPage: zod.number().nullish(),
+      currentLine: zod.number().nullish(),
+      dailySabaq: zod
+        .array(zod.boolean())
+        .min(getDashboardResponseThisWeekEntryDailySabaqMin)
+        .max(getDashboardResponseThisWeekEntryDailySabaqMax)
+        .nullish(),
+      dailyRmv: zod
+        .array(zod.boolean())
+        .min(getDashboardResponseThisWeekEntryDailyRmvMin)
+        .max(getDashboardResponseThisWeekEntryDailyRmvMax)
+        .nullish(),
+      dailyReview: zod
+        .array(zod.boolean())
+        .min(getDashboardResponseThisWeekEntryDailyReviewMin)
+        .max(getDashboardResponseThisWeekEntryDailyReviewMax)
+        .nullish(),
+      dailyAbsent: zod
+        .array(zod.boolean())
+        .min(getDashboardResponseThisWeekEntryDailyAbsentMin)
+        .max(getDashboardResponseThisWeekEntryDailyAbsentMax)
+        .nullish(),
       successfulDays: zod.number(),
       daysAttended: zod.number(),
+      weeklyPoints: zod.number(),
+      rmvAmount: zod.string().nullish(),
+      reviewAmount: zod.string().nullish(),
       weekRating: zod
         .enum([
           "excellent",
@@ -368,17 +568,12 @@ export const GetDashboardResponseItem = zod.object({
           "difficult_week",
         ])
         .nullish(),
-      rmvQuality: zod
-        .enum(["excellent", "good", "needs_repeat", "incomplete"])
-        .nullish(),
-      reviewQuality: zod
-        .enum(["excellent", "good", "needs_repeat", "incomplete"])
-        .nullish(),
       teacherNotes: zod.string().nullish(),
       createdAt: zod.string(),
       updatedAt: zod.string(),
     })
     .nullish(),
+  completedJuz: zod.array(zod.number()),
 });
 export const GetDashboardResponse = zod.array(GetDashboardResponseItem);
 
@@ -388,8 +583,8 @@ export const GetDashboardResponse = zod.array(GetDashboardResponseItem);
 export const GetClassStatsResponse = zod.object({
   totalStudents: zod.number(),
   averageSuccessRate: zod.number(),
-  totalAyahsMemorized: zod.number(),
-  avgAyahsPerWeek: zod.number(),
+  totalLinesMemorized: zod.number(),
+  avgLinesPerWeek: zod.number(),
   topPerformers: zod.array(
     zod.object({
       studentId: zod.number(),
@@ -402,6 +597,114 @@ export const GetClassStatsResponse = zod.object({
       studentId: zod.number(),
       name: zod.string(),
       successRate: zod.number(),
+    }),
+  ),
+  studentProgress: zod.array(
+    zod.object({
+      studentId: zod.number(),
+      name: zod.string(),
+      totalLines: zod.number(),
+      totalJuz: zod.number(),
+      weeklyPace: zod.number(),
+    }),
+  ),
+  studentRankings: zod.array(
+    zod.object({
+      studentId: zod.number(),
+      name: zod.string(),
+      compositeScore: zod.number(),
+      successRate: zod.number(),
+      weeklyPace: zod.number(),
+      consistency: zod.number(),
+    }),
+  ),
+  attentionFlags: zod.array(
+    zod.object({
+      studentId: zod.number(),
+      name: zod.string(),
+      flags: zod.array(
+        zod.object({
+          type: zod.string(),
+          label: zod.string(),
+        }),
+      ),
+    }),
+  ),
+  weeklyTrends: zod.array(
+    zod.object({
+      weekStart: zod.string(),
+      avgSuccessRate: zod.number(),
+      totalLines: zod.number(),
+      avgRating: zod.number(),
+    }),
+  ),
+  streakLeaderboard: zod.array(
+    zod.object({
+      studentId: zod.number(),
+      name: zod.string(),
+      currentStreak: zod.number(),
+      best12WeekStreak: zod.number(),
+    }),
+  ),
+  linesThisMonth: zod.number(),
+  linesLastMonth: zod.number(),
+  activeStudentsThisMonth: zod.number(),
+  activeStudentsLastMonth: zod.number(),
+  avgLinesPerStudentThisMonth: zod.number(),
+  avgLinesPerStudentLastMonth: zod.number(),
+  spotlights: zod.array(
+    zod.object({
+      studentId: zod.number(),
+      name: zod.string(),
+      insightText: zod.string(),
+      type: zod.enum([
+        "big_increase",
+        "first_excellent",
+        "personal_record",
+        "milestone_page",
+        "perfect_streak",
+        "big_drop",
+        "streak_break",
+        "rating_drop",
+      ]),
+      category: zod.enum(["positive", "concern"]),
+    }),
+  ),
+  monthlyDecomposition: zod.object({
+    schoolDaysThisMonth: zod.number(),
+    schoolDaysLastMonth: zod.number(),
+    linesPerSchoolDayThisMonth: zod.number(),
+    linesPerSchoolDayLastMonth: zod.number(),
+    biggestContributors: zod.array(
+      zod.object({
+        studentId: zod.number(),
+        name: zod.string(),
+        linesDelta: zod.number(),
+      }),
+    ),
+  }),
+  ratingDistributions: zod.array(
+    zod.object({
+      weekStart: zod.string(),
+      counts: zod.object({
+        excellent: zod.number(),
+        strong: zod.number(),
+        steady: zod.number(),
+        needs_improvement: zod.number(),
+        difficult_week: zod.number(),
+      }),
+    }),
+  ),
+  thisWeekSummary: zod.object({
+    totalClassLines: zod.number(),
+    avgLinesPerStudent: zod.number(),
+    bestWeekLinesThisMonth: zod.number(),
+  }),
+  absentStudents: zod.array(
+    zod.object({
+      studentId: zod.number(),
+      name: zod.string(),
+      daysAttended: zod.number(),
     }),
   ),
 });

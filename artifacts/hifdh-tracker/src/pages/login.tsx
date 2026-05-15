@@ -20,13 +20,24 @@ export default function Login() {
 
   return (
     <div className="min-h-screen w-full flex bg-background relative overflow-hidden">
-      {/* Background Image Panel */}
-      <div className="hidden lg:block lg:w-1/2 relative bg-primary">
-        <div className="absolute inset-0 bg-black/20 z-10" />
-        <img 
+      {/* Background Panel with gradient + geometric pattern */}
+      <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
+        {/* Radial gradient base */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,hsl(var(--primary)/0.8),hsl(160,84%,10%))]" />
+        {/* Islamic geometric pattern using CSS */}
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30Z' fill='none' stroke='white' stroke-width='1'/%3E%3Cpath d='M30 10L50 30L30 50L10 30Z' fill='none' stroke='white' stroke-width='0.5'/%3E%3Ccircle cx='30' cy='30' r='8' fill='none' stroke='white' stroke-width='0.5'/%3E%3C/svg%3E")`,
+            backgroundSize: "60px 60px",
+          }}
+        />
+        {/* Overlay for depth */}
+        <div className="absolute inset-0 bg-black/10 z-10" />
+        <img
           src={`${import.meta.env.BASE_URL}images/login-bg.png`}
-          alt="Islamic geometric pattern" 
-          className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-50"
+          alt="Hifdh Tracker Logo"
+          className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-40"
         />
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-white p-12 text-center">
           <BookOpen className="w-24 h-24 mb-8 opacity-90" />
@@ -39,7 +50,7 @@ export default function Login() {
 
       {/* Login Form Panel */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 z-20">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md"

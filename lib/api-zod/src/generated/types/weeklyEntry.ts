@@ -3,9 +3,9 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
-import type { Quality } from "./quality";
+import type { BoolArray5 } from "./boolArray5";
 import type { WeekRating } from "./weekRating";
 
 export interface WeeklyEntry {
@@ -13,16 +13,19 @@ export interface WeeklyEntry {
   studentId: number;
   weekStartDate: string;
   weekEndDate: string;
-  newMemFromSurah?: number | null;
-  newMemFromAyah?: number | null;
-  newMemToSurah?: number | null;
-  newMemToAyah?: number | null;
-  ayahsMemorized: number;
+  memorizationLines: number;
+  currentPage?: number | null;
+  currentLine?: number | null;
+  dailySabaq?: BoolArray5 | null;
+  dailyRmv?: BoolArray5 | null;
+  dailyReview?: BoolArray5 | null;
+  dailyAbsent?: BoolArray5 | null;
   successfulDays: number;
   daysAttended: number;
+  weeklyPoints: number;
+  rmvAmount?: string | null;
+  reviewAmount?: string | null;
   weekRating?: WeekRating | null;
-  rmvQuality?: Quality | null;
-  reviewQuality?: Quality | null;
   teacherNotes?: string | null;
   createdAt: string;
   updatedAt: string;

@@ -3,15 +3,15 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 
 export interface StudentStats {
-  totalAyahsMemorized: number;
+  totalLinesMemorized: number;
   totalQuranPercentage: number;
   juzCompleted: number;
   overallSuccessRate: number;
   currentStreakWeeks: number;
-  ayahsThisMonth: number;
-  ayahsLastMonth: number;
+  linesThisMonth: number;
+  linesLastMonth: number;
 }

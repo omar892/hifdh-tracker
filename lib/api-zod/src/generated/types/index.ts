@@ -3,14 +3,19 @@
  * Do not edit manually.
  * Api
  * Quran Hifdh Tracker API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 
+export * from "./absentStudent";
+export * from "./attentionFlag";
 export * from "./authResponse";
+export * from "./boolArray5";
 export * from "./calendarWeek";
 export * from "./classStats";
 export * from "./createStudentRequest";
+export * from "./createStudentRequestGender";
 export * from "./dashboardStudent";
+export * from "./dashboardStudentGender";
 export * from "./errorResponse";
 export * from "./getStudentCalendarParams";
 export * from "./healthStatus";
@@ -18,13 +23,29 @@ export * from "./listStudentsParams";
 export * from "./listWeeklyEntriesParams";
 export * from "./loginRequest";
 export * from "./messageResponse";
-export * from "./quality";
+export * from "./monthlyContributor";
+export * from "./monthlyDecomposition";
+export * from "./ratingDistributionWeek";
+export * from "./ratingDistributionWeekCounts";
 export * from "./student";
+export * from "./studentAttention";
 export * from "./studentCalendar";
+export * from "./studentGender";
 export * from "./studentPerformance";
+export * from "./studentProgress";
+export * from "./studentProjections";
+export * from "./studentProjectionsTrend";
+export * from "./studentRanking";
+export * from "./studentSpotlight";
+export * from "./studentSpotlightCategory";
+export * from "./studentSpotlightType";
 export * from "./studentStats";
+export * from "./studentStreak";
 export * from "./surah";
+export * from "./thisWeekSummary";
 export * from "./updateStudentRequest";
+export * from "./updateStudentRequestGender";
 export * from "./upsertWeeklyEntryRequest";
 export * from "./weeklyEntry";
 export * from "./weekRating";
+export * from "./weekTrend";
