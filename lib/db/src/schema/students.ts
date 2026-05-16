@@ -1,6 +1,7 @@
 import { pgTable, serial, text, integer, boolean, date, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { mushafsTable } from "./mushafs";
 
 export const studentsTable = pgTable("students", {
   id: serial("id").primaryKey(),
@@ -11,6 +12,10 @@ export const studentsTable = pgTable("students", {
   startDate: date("start_date").notNull(),
   notes: text("notes"),
   active: boolean("active").notNull().default(true),
+  mushafPreference: text("mushaf_preference")
+    .notNull()
+    .default("madani_15")
+    .references(() => mushafsTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
