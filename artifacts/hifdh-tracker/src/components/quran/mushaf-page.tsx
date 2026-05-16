@@ -40,6 +40,8 @@ interface MushafPageProps {
   mushafId: string;        // 'madani_15' | 'indopak_15'
   pageNumber: number;      // 1–604 (madani) / 1–610 (indopak_15)
   highlightLine?: number;  // 1–15
+  /** When provided, lines become hoverable + tappable; click fires this with the line number. */
+  onSelectLine?: (lineNumber: number) => void;
   className?: string;
   fontSize?: "sm" | "md" | "lg";
 }
@@ -80,6 +82,7 @@ export function MushafPage({
   mushafId,
   pageNumber,
   highlightLine,
+  onSelectLine,
   className,
   fontSize = "md",
 }: MushafPageProps) {
@@ -162,30 +165,46 @@ export function MushafPage({
     >
       {[...linesByNumber.entries()].map(([lineNum, words]) => {
         const isHighlight = highlightLine === lineNum;
+        const selectable = !!onSelectLine;
         // aria text — pull text_uthmani so screen readers get something meaningful
         const aria = words.map((w) => w.text_uthmani ?? "").join(" ");
+        const lineClass = cn(
+          "mushaf-line transition-colors",
+          isHighlight && "rounded-md bg-emerald-50 ring-2 ring-emerald-400 ring-offset-1 dark:bg-emerald-950/30",
+          selectable && !isHighlight && "rounded-md cursor-pointer hover:bg-emerald-50/60 hover:ring-1 hover:ring-emerald-300 dark:hover:bg-emerald-950/20",
+          selectable && "px-2",
+        );
+        const lineContent = words.map((w) => (
+          <span
+            key={w.id}
+            className={w.char_type_name === "end" ? "font-uthmanic-hafs" : undefined}
+            dangerouslySetInnerHTML={{ __html: w.code_v2 ?? "" }}
+          />
+        ));
+        if (selectable) {
+          return (
+            <button
+              key={lineNum}
+              type="button"
+              aria-label={`${aria} (tap to set as last line)`}
+              onClick={() => onSelectLine!(lineNum)}
+              className={cn(lineClass, "block w-full text-center")}
+              style={{ fontFamily, fontFeatureSettings: '"liga"' }}
+            >
+              {lineContent}
+            </button>
+          );
+        }
         return (
-          <div
-            key={lineNum}
-            aria-label={aria}
-            className={cn(
-              "mushaf-line transition-colors",
-              isHighlight && "rounded-md bg-emerald-50 ring-2 ring-emerald-400 ring-offset-1 dark:bg-emerald-950/30",
-            )}
-          >
-            {words.map((w) => (
-              <span
-                key={w.id}
-                className={w.char_type_name === "end" ? "font-uthmanic-hafs" : undefined}
-                dangerouslySetInnerHTML={{ __html: w.code_v2 ?? "" }}
-              />
-            ))}
+          <div key={lineNum} aria-label={aria} className={lineClass}>
+            {lineContent}
           </div>
         );
       })}
       <div className="mt-4 text-xs text-muted-foreground" lang="en" dir="ltr">
         Page {pageNumber}
         {highlightLine ? ` · line ${highlightLine}` : ""}
+        {onSelectLine ? " · tap a line to set" : ""}
       </div>
     </div>
   );

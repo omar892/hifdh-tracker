@@ -1056,6 +1056,8 @@ export default function LogWeek() {
           mushafId={(student?.mushafPreference ?? "madani_15") as "madani_15" | "indopak_15"}
           page={currentPage}
           line={currentLine}
+          onSelectLine={(ln) => setCurrentLine(ln)}
+          onPageChange={(p) => setCurrentPage(p)}
         />
 
         {/* ── RMV & Review amounts ── */}
