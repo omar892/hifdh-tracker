@@ -5,6 +5,7 @@ import studentsRouter from "./students";
 import entriesRouter from "./entries";
 import statsRouter from "./stats";
 import aiRouter from "./ai";
+import quranRouter from "./quran";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(studentsRouter);
 router.use(entriesRouter);
 router.use(statsRouter);
 router.use(aiRouter);
+router.use(quranRouter);
 
 export default router;

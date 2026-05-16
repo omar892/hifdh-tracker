@@ -17,6 +17,7 @@ const CreateStudentBodyCoerced = z.object({
   currentLine: z.number().min(1).max(15),
   startDate: z.coerce.date(),
   notes: z.string().nullish(),
+  mushafPreference: z.enum(["madani_15", "indopak_15"]).optional(),
   completedJuz: z.array(z.number().min(1).max(30)),
 });
 
@@ -65,6 +66,7 @@ router.post("/students", requireAuth, async (req, res) => {
     currentLine: body.currentLine,
     startDate: body.startDate.toISOString().split('T')[0],
     notes: body.notes ?? null,
+    ...(body.mushafPreference ? { mushafPreference: body.mushafPreference } : {}),
   }).returning();
 
   if (body.completedJuz.length > 0) {
@@ -94,6 +96,7 @@ router.patch("/students/:id", requireAuth, async (req, res) => {
     currentLine: number;
     notes: string | null;
     active: boolean;
+    mushafPreference: string;
   }> = {};
   if (body.name !== undefined) updateData.name = body.name;
   if (body.gender !== undefined) updateData.gender = body.gender ?? null;
@@ -101,6 +104,7 @@ router.patch("/students/:id", requireAuth, async (req, res) => {
   if (body.currentLine !== undefined) updateData.currentLine = body.currentLine;
   if (body.notes !== undefined) updateData.notes = body.notes ?? null;
   if (body.active !== undefined) updateData.active = body.active;
+  if (body.mushafPreference !== undefined) updateData.mushafPreference = body.mushafPreference;
 
   const hasUpdate = Object.keys(updateData).length > 0;
   let student;

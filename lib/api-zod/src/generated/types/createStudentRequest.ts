@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.3.0
  */
 import type { CreateStudentRequestGender } from "./createStudentRequestGender";
+import type { MushafPreference } from "./mushafPreference";
 
 export interface CreateStudentRequest {
   name: string;
@@ -22,5 +23,6 @@ export interface CreateStudentRequest {
   currentLine: number;
   startDate: string;
   notes?: string | null;
+  mushafPreference?: MushafPreference;
   completedJuz: number[];
 }

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, weeklyEntriesTable, studentsTable, studentCompletedJuzTable } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, lt } from "drizzle-orm";
 import {
   ListWeeklyEntriesParams,
   ListWeeklyEntriesQueryParams,
@@ -10,6 +10,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import { getJuzForPage } from "../lib/quran-data";
+import { enrichLogEntry } from "../lib/quran/lookup";
 import { getCompletedJuz } from "./students";
 
 const router: IRouter = Router();
@@ -191,7 +192,41 @@ router.put("/students/:studentId/entries/weekly/:weekStart", requireAuth, async 
     }
   }
 
-  res.json(serializeEntry(entry));
+  // Enrich the response with this week's verse coverage from the Quran
+  // Foundation cache. Look up the student's mushaf preference + the previous
+  // entry's end position to derive the page range covered.
+  const [student] = await db
+    .select()
+    .from(studentsTable)
+    .where(eq(studentsTable.id, studentId));
+
+  const [prevEntry] = await db
+    .select()
+    .from(weeklyEntriesTable)
+    .where(
+      and(
+        eq(weeklyEntriesTable.studentId, studentId),
+        lt(weeklyEntriesTable.weekStartDate, mondayDate),
+      ),
+    )
+    .orderBy(desc(weeklyEntriesTable.weekStartDate))
+    .limit(1);
+
+  let coverage = null;
+  try {
+    coverage = await enrichLogEntry({
+      mushafId: student?.mushafPreference ?? "madani_15",
+      prevPage: prevEntry?.currentPage ?? null,
+      prevLine: prevEntry?.currentLine ?? null,
+      currentPage: entry.currentPage ?? null,
+      currentLine: entry.currentLine ?? null,
+    });
+  } catch (err) {
+    // Don't fail the write if the cache isn't hydrated yet
+    console.warn("[entries] coverage enrichment skipped:", err);
+  }
+
+  res.json({ ...serializeEntry(entry), coverage });
   } catch (err) { next(err); }
 });
 

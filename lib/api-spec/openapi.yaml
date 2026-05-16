@@ -414,9 +414,13 @@ components:
         authenticated:
           type: boolean
 
+    MushafPreference:
+      type: string
+      enum: [madani_15, indopak_15]
+
     Student:
       type: object
-      required: [id, name, currentPage, currentLine, startDate, active, createdAt, completedJuz]
+      required: [id, name, currentPage, currentLine, startDate, active, createdAt, completedJuz, mushafPreference]
       properties:
         id:
           type: integer
@@ -441,6 +445,8 @@ components:
           nullable: true
         active:
           type: boolean
+        mushafPreference:
+          $ref: "#/components/schemas/MushafPreference"
         createdAt:
           type: string
         completedJuz:
@@ -471,6 +477,8 @@ components:
         notes:
           type: string
           nullable: true
+        mushafPreference:
+          $ref: "#/components/schemas/MushafPreference"
         completedJuz:
           type: array
           items:
@@ -500,6 +508,8 @@ components:
           nullable: true
         active:
           type: boolean
+        mushafPreference:
+          $ref: "#/components/schemas/MushafPreference"
         completedJuz:
           type: array
           items:

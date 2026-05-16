@@ -25,6 +25,14 @@ export interface AuthResponse {
   authenticated: boolean;
 }
 
+export type MushafPreference =
+  (typeof MushafPreference)[keyof typeof MushafPreference];
+
+export const MushafPreference = {
+  madani_15: "madani_15",
+  indopak_15: "indopak_15",
+} as const;
+
 export type StudentGender =
   | (typeof StudentGender)[keyof typeof StudentGender]
   | null;
@@ -51,6 +59,7 @@ export interface Student {
   startDate: string;
   notes?: string | null;
   active: boolean;
+  mushafPreference: MushafPreference;
   createdAt: string;
   completedJuz: number[];
 }
@@ -79,6 +88,7 @@ export interface CreateStudentRequest {
   currentLine: number;
   startDate: string;
   notes?: string | null;
+  mushafPreference?: MushafPreference;
   completedJuz: number[];
 }
 
@@ -107,6 +117,7 @@ export interface UpdateStudentRequest {
   startDate?: string;
   notes?: string | null;
   active?: boolean;
+  mushafPreference?: MushafPreference;
   completedJuz?: number[];
 }
 

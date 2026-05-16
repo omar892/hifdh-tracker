@@ -5,6 +5,7 @@
  * Quran Hifdh Tracker API
  * OpenAPI spec version: 0.3.0
  */
+import type { MushafPreference } from "./mushafPreference";
 import type { UpdateStudentRequestGender } from "./updateStudentRequestGender";
 
 export interface UpdateStudentRequest {
@@ -23,5 +24,6 @@ export interface UpdateStudentRequest {
   startDate?: string;
   notes?: string | null;
   active?: boolean;
+  mushafPreference?: MushafPreference;
   completedJuz?: number[];
 }

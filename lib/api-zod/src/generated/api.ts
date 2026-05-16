@@ -59,6 +59,7 @@ export const ListStudentsResponseItem = zod.object({
   startDate: zod.string(),
   notes: zod.string().nullish(),
   active: zod.boolean(),
+  mushafPreference: zod.enum(["madani_15", "indopak_15"]),
   createdAt: zod.string(),
   completedJuz: zod.array(zod.number()),
 });
@@ -78,6 +79,7 @@ export const CreateStudentBody = zod.object({
   currentLine: zod.number().min(1).max(createStudentBodyCurrentLineMax),
   startDate: zod.string(),
   notes: zod.string().nullish(),
+  mushafPreference: zod.enum(["madani_15", "indopak_15"]).optional(),
   completedJuz: zod.array(zod.number()),
 });
 
@@ -101,6 +103,7 @@ export const GetStudentResponse = zod.object({
   startDate: zod.string(),
   notes: zod.string().nullish(),
   active: zod.boolean(),
+  mushafPreference: zod.enum(["madani_15", "indopak_15"]),
   createdAt: zod.string(),
   completedJuz: zod.array(zod.number()),
 });
@@ -132,6 +135,7 @@ export const UpdateStudentBody = zod.object({
   startDate: zod.string().optional(),
   notes: zod.string().nullish(),
   active: zod.boolean().optional(),
+  mushafPreference: zod.enum(["madani_15", "indopak_15"]).optional(),
   completedJuz: zod.array(zod.number()).optional(),
 });
 
@@ -148,6 +152,7 @@ export const UpdateStudentResponse = zod.object({
   startDate: zod.string(),
   notes: zod.string().nullish(),
   active: zod.boolean(),
+  mushafPreference: zod.enum(["madani_15", "indopak_15"]),
   createdAt: zod.string(),
   completedJuz: zod.array(zod.number()),
 });

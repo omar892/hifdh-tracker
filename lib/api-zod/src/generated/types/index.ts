@@ -25,6 +25,7 @@ export * from "./loginRequest";
 export * from "./messageResponse";
 export * from "./monthlyContributor";
 export * from "./monthlyDecomposition";
+export * from "./mushafPreference";
 export * from "./ratingDistributionWeek";
 export * from "./ratingDistributionWeekCounts";
 export * from "./student";
