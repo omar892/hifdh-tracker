@@ -3,6 +3,16 @@
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
+/* ── Quran Foundation: UthmanicHafs for verse-end markers (۝) ──── */
+@font-face {
+  font-family: "UthmanicHafs";
+  src: url("https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.woff2") format("woff2");
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+.font-uthmanic-hafs { font-family: "UthmanicHafs", serif; }
+.mushaf-line { display: block; }
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
