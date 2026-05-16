@@ -51,3 +51,7 @@ Thumbs.db
 # Environment variables
 .env
 .env.*
+!.env.example
+
+# Local DB backups (created before destructive schema changes)
+backups/
