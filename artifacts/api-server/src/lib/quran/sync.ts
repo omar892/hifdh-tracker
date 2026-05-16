@@ -12,7 +12,8 @@ import { quranGet } from "./client";
 interface QFPage {
   id: number;
   page_number: number;
-  verse_mapping: Record<string, string>; // {"2:144": "2:152"}
+  /** QF actual format: { "<surahNumber>": "<firstAyah>-<lastAyah>" } */
+  verse_mapping: Record<string, string>;
   first_verse_id: number;
   last_verse_id: number;
   verses_count: number;
@@ -24,7 +25,13 @@ interface ListPagesResponse {
 
 /**
  * Parse QF's verse_mapping into our structured surah breakdown.
- * Handles pages that span multiple surahs (multiple keys in the mapping).
+ *
+ * Real QF format (verified against live API):
+ *   { "4": "176-176", "5": "1-2" }   // multi-surah page
+ *   { "2": "135-141" }               // single-surah page
+ *
+ * Keys are surah numbers (as strings), values are "firstAyah-lastAyah"
+ * ranges. Even single ayahs use the dash form ("176-176").
  */
 export function parseVerseMapping(
   verseMapping: Record<string, string>,
@@ -34,14 +41,18 @@ export function parseVerseMapping(
     throw new Error("verse_mapping is empty");
   }
 
-  const surahs: PageSurahBreakdown[] = entries.map(([startKey, endKey]) => {
-    const [startSurah, startAyah] = startKey.split(":").map(Number);
-    const [endSurah, endAyah] = endKey.split(":").map(Number);
-    if (startSurah !== endSurah) {
-      // Each verse_mapping entry should be per-surah; QF format guarantees this.
-      throw new Error(`Unexpected cross-surah mapping entry: ${startKey} → ${endKey}`);
+  const surahs: PageSurahBreakdown[] = entries.map(([surahStr, rangeStr]) => {
+    const surahNumber = Number(surahStr);
+    if (!Number.isFinite(surahNumber) || surahNumber < 1) {
+      throw new Error(`bad surah key in verse_mapping: ${surahStr}`);
     }
-    return { surahNumber: startSurah, ayahStart: startAyah, ayahEnd: endAyah };
+    const parts = rangeStr.split("-").map((s) => Number(s.trim()));
+    const ayahStart = parts[0];
+    const ayahEnd = parts.length > 1 ? parts[1] : parts[0];
+    if (!Number.isFinite(ayahStart) || !Number.isFinite(ayahEnd)) {
+      throw new Error(`bad verse range "${rangeStr}" for surah ${surahStr}`);
+    }
+    return { surahNumber, ayahStart, ayahEnd };
   });
 
   // Order by surah number ascending so first/last keys reflect reading order
