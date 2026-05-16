@@ -8,12 +8,14 @@ import { useToast } from "@/hooks/use-toast";
 import { getGenderAvatarClass, type Gender } from "@/lib/gender-colors";
 
 type GenderFilter = "all" | "male" | "female" | "unset";
+type MushafPreference = "madani_15" | "indopak_15";
 
 interface StudentFormData {
   name: string;
   gender: Gender;
   page: number;
   line: number;
+  mushafPreference: MushafPreference;
   completedJuz: number[];
 }
 
@@ -89,12 +91,15 @@ function StudentForm({
   const [gender, setGender] = useState<Gender>(initial?.gender ?? null);
   const [page, setPage] = useState(initial?.page ?? 1);
   const [line, setLine] = useState(initial?.line ?? 1);
+  const [mushafPreference, setMushafPreference] = useState<MushafPreference>(
+    initial?.mushafPreference ?? "madani_15",
+  );
   const [completedJuz, setCompletedJuz] = useState<number[]>(initial?.completedJuz ?? []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onSave({ name: name.trim(), gender, page, line, completedJuz });
+    onSave({ name: name.trim(), gender, page, line, mushafPreference, completedJuz });
   };
 
   return (
@@ -133,6 +138,32 @@ function StudentForm({
               }`}
             >
               {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+          Mushaf
+        </label>
+        <div className="flex gap-2">
+          {([
+            { value: "madani_15" as const, label: "Madani 15-Line", subtitle: "604 pages" },
+            { value: "indopak_15" as const, label: "Indo-Pak 15-Line", subtitle: "610 pages" },
+          ]).map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setMushafPreference(opt.value)}
+              className={`flex-1 py-2.5 px-3 rounded-xl border-2 font-bold text-sm transition-all ${
+                mushafPreference === opt.value
+                  ? "bg-primary text-primary-foreground border-primary shadow-md"
+                  : "bg-background border-border text-muted-foreground hover:border-primary/30"
+              }`}
+            >
+              <div>{opt.label}</div>
+              <div className="text-xs font-normal opacity-70 mt-0.5">{opt.subtitle}</div>
             </button>
           ))}
         </div>
@@ -255,6 +286,7 @@ export default function ManageStudents() {
         currentPage: data.page,
         currentLine: data.line,
         startDate: new Date().toISOString().split("T")[0],
+        mushafPreference: data.mushafPreference,
         completedJuz: data.completedJuz,
       },
     });
@@ -268,6 +300,7 @@ export default function ManageStudents() {
         gender: data.gender,
         currentPage: data.page,
         currentLine: data.line,
+        mushafPreference: data.mushafPreference,
         completedJuz: data.completedJuz,
       },
     });
@@ -300,7 +333,7 @@ export default function ManageStudents() {
           <div className="p-4">
             <p className="text-sm font-bold text-muted-foreground mb-3 uppercase tracking-wider">Edit: {student.name}</p>
             <StudentForm
-              initial={{ name: student.name, gender: student.gender as Gender, page: student.currentPage, line: student.currentLine, completedJuz: student.completedJuz ?? [] }}
+              initial={{ name: student.name, gender: student.gender as Gender, page: student.currentPage, line: student.currentLine, mushafPreference: (student.mushafPreference ?? "madani_15") as MushafPreference, completedJuz: student.completedJuz ?? [] }}
               onSave={(data) => handleUpdate(student.id, data)}
               onCancel={() => setEditingId(null)}
               isSaving={updateMutation.isPending}

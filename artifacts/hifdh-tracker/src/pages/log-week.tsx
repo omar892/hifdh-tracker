@@ -33,6 +33,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { getGenderAvatarClass, getGenderDotClass, type Gender } from "@/lib/gender-colors";
+import { MushafPreviewPanel } from "@/components/quran/mushaf-preview-panel";
 
 /* ── Constants ────────────────────────────────────── */
 
@@ -1049,6 +1050,13 @@ export default function LogWeek() {
             })()}
           </div>
         </div>
+
+        {/* ── Mushaf preview ── */}
+        <MushafPreviewPanel
+          mushafId={(student?.mushafPreference ?? "madani_15") as "madani_15" | "indopak_15"}
+          page={currentPage}
+          line={currentLine}
+        />
 
         {/* ── RMV & Review amounts ── */}
         <div className="grid grid-cols-2 gap-2.5 mb-3">

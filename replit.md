@@ -64,9 +64,15 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
   - `src/routes/students.ts` — CRUD for students
   - `src/routes/entries.ts` — Weekly entry CRUD (`/students/:id/entries/weekly`)
   - `src/routes/stats.ts` — `/api/dashboard`, `/api/students/:id/stats`, `/api/students/:id/calendar`, `/api/stats/class`, `/api/surahs`
+  - `src/routes/quran.ts` — Quran Foundation proxy (`/api/mushafs`, `/api/quran/mushafs/:id/pages/:n`, `/api/quran/mushafs/:id/pages/:n/verses`, `POST /api/quran/sync`)
   - `src/lib/quran-data.ts` — Quran surah data, ayah counting helpers (`calculateAyahsUpTo`, `calculateAyahsBetween`, `calculateJuzFromPosition`)
+  - `src/lib/quran/` — Quran Foundation OAuth2 client (`auth.ts`, `client.ts`), page sync (`sync.ts`), and lookup helpers (`lookup.ts`)
 - Depends on: `@workspace/db`, `@workspace/api-zod`
 - Auth: session-based with `requireAuth` middleware; password from `TEACHER_PASSWORD` env var (default: `hifdh2024`)
+- Quran Foundation API (server-only, never exposed to browser):
+  - `QURAN_CLIENT_ID` + `QURAN_CLIENT_SECRET` from https://api-docs.quran.foundation/
+  - `QURAN_ENV` = `prelive` (sandbox) or `production`
+  - Hydrate the page-to-verse cache: `pnpm --filter @workspace/api-server run quran:sync` (run once after setting credentials; safe to re-run)
 
 ### `artifacts/hifdh-tracker` (`@workspace/hifdh-tracker`)
 
@@ -83,6 +89,8 @@ Pages:
 Key components:
 - `src/components/ui/surah-search-select.tsx` — Custom Surah dropdown with search
 - `src/components/layout/app-layout.tsx` — Sidebar + mobile bottom nav layout with dark mode (persisted to localStorage)
+- `src/components/quran/mushaf-page.tsx` — Renders a single Mushaf page from the Quran Foundation API with line-by-line QCF v2 font rendering; supports an optional `highlightLine` prop
+- `src/components/quran/mushaf-preview-panel.tsx` — Collapsible wrapper around `<MushafPage>`, used in the weekly log entry form
 
 ### `lib/db` (`@workspace/db`)
 
@@ -90,8 +98,9 @@ Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client insta
 
 - `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
 - `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/students.ts` — `students` table
+- `src/schema/students.ts` — `students` table (incl. `mushaf_preference` FK to `mushafs`)
 - `src/schema/weekly-entries.ts` — `weekly_entries` table (replaces old `daily_entries`)
+- `src/schema/mushafs.ts` — `mushafs` (catalog: `'madani_15'`, `'indopak_15'`) and `mushaf_pages` (per-page verse-range cache hydrated from the Quran Foundation API)
 - `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
 
 **Weekly Entries Schema** (`weekly_entries` table):
