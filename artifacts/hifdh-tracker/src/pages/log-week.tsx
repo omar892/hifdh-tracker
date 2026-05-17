@@ -39,7 +39,6 @@ import { MushafPreviewPanel } from "@/components/quran/mushaf-preview-panel";
 /* ── Constants ────────────────────────────────────── */
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"] as const;
-const ROWS = ["Memorization", "RMV", "Review"] as const;
 
 const WEEK_RATINGS = [
   { value: "excellent", label: "Excellent", emoji: "\u{1F31F}", activeBg: "bg-yellow-500", shadow: "shadow-yellow-500/20" },
@@ -720,28 +719,24 @@ export default function LogWeek() {
     setDailyAbsent(next);
   };
 
-  // Computed
+  // Computed totals — drive the points/successful-days summary card
   let totalPoints = 0;
   let successfulDays = 0;
   let daysAttended = 0;
-  const dailyPoints: number[] = [];
   for (let i = 0; i < 5; i++) {
-    if (dailyAbsent[i]) { dailyPoints.push(-1); continue; }
+    if (dailyAbsent[i]) continue;
     daysAttended++;
     let dp = 0;
     if (dailySabaq[i]) { dp++; totalPoints++; }
     if (dailyRmv[i]) { dp++; totalPoints++; }
     if (dailyReview[i]) { dp++; totalPoints++; }
     if (dp === 3) successfulDays++;
-    dailyPoints.push(dp);
   }
 
   const maxPoints = daysAttended * 3;
   const pointsColor = totalPoints >= maxPoints * 0.87 ? "text-emerald-600 dark:text-emerald-400"
     : totalPoints >= maxPoints * 0.67 ? "text-yellow-600 dark:text-yellow-400"
     : "text-red-600 dark:text-red-400";
-
-  const rowTotal = (arr: boolean[]) => arr.filter((v, i) => v && !dailyAbsent[i]).length;
 
   const handleSubmit = async () => {
     if (!student) {

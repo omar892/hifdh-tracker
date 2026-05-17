@@ -4,7 +4,6 @@ import { useGetDashboard } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { format, startOfWeek, addDays, getDay } from "date-fns";
 import { CheckCircle2, Clock, BookOpen, Play, Pencil, AlertCircle } from "lucide-react";
-import { motion } from "framer-motion";
 import { TOTAL_PAGES, getLinesForCompletedJuz, TOTAL_LINES } from "@/lib/quran-utils";
 import { getGenderAvatarClass, getGenderBorderClass, type Gender } from "@/lib/gender-colors";
 
@@ -169,17 +168,12 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-          {students?.map((student, i) => {
+          {students?.map((student) => {
             const juzCount = student.completedJuz?.length ?? 0;
             const juzPct = Math.round((juzCount / 30) * 100);
 
             return (
-              <motion.div
-                key={student.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, delay: i * 0.03 }}
-              >
+              <div key={student.id}>
                 <Link href={`/students/${student.id}/profile`} className="block group">
                   <div className={`bg-card rounded-2xl p-4 border hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 h-full flex flex-col relative overflow-hidden ${getGenderBorderClass(student.gender as Gender)} ${
                     student.thisWeekDone
@@ -256,7 +250,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </Link>
-              </motion.div>
+              </div>
             );
           })}
         </div>

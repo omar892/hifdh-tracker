@@ -11,7 +11,6 @@ import {
   Sun,
   BookOpen,
 } from "lucide-react";
-import { motion } from "framer-motion";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -158,15 +157,12 @@ export function AppLayout({ children, title }: AppLayoutProps) {
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8 pb-28 md:pb-8">
-          <motion.div
-            key={location}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-            className="max-w-6xl mx-auto"
-          >
+          {/* Page entrance animation removed — framer-motion was leaving
+              content stuck at opacity:0 in our preview environment, fading
+              out the bottom of every page. Static render is reliable. */}
+          <div key={location} className="max-w-6xl mx-auto">
             {children}
-          </motion.div>
+          </div>
         </div>
 
         {/* Mobile bottom nav */}

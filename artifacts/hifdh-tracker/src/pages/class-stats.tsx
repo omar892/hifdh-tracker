@@ -3,7 +3,6 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { useProtectedRoute } from "@/hooks/use-auth";
 import { useGetClassStats, useGetDashboard } from "@workspace/api-client-react";
 import { Link } from "wouter";
-import { motion } from "framer-motion";
 import {
   AreaChart,
   Area,
@@ -50,16 +49,11 @@ function StudentLink({ id, children, className = "" }: { id: number; children: R
   );
 }
 
-function Section({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, delay }}
-    >
-      {children}
-    </motion.div>
-  );
+// framer-motion entrance animations were not completing reliably in our
+// preview environment, leaving sections stuck at opacity:0. Decorative
+// fade-in removed; sections render in their final state immediately.
+function Section({ children }: { children: React.ReactNode; delay?: number }) {
+  return <div>{children}</div>;
 }
 
 function StatCard({
