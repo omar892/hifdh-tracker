@@ -1,7 +1,7 @@
 import { useProtectedRoute } from "@/hooks/use-auth";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useGetDashboard } from "@workspace/api-client-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { format, startOfWeek, addDays, getDay } from "date-fns";
 import { CheckCircle2, Clock, BookOpen, Play, Pencil, AlertCircle } from "lucide-react";
 import { TOTAL_PAGES, getLinesForCompletedJuz, TOTAL_LINES } from "@/lib/quran-utils";
@@ -49,6 +49,7 @@ function WeekDots() {
 export default function Dashboard() {
   const { isLoading: authLoading } = useProtectedRoute();
   const { data: students, isLoading: dataLoading } = useGetDashboard();
+  const [, setLocation] = useLocation();
 
   if (authLoading || dataLoading) {
     return (
@@ -174,7 +175,20 @@ export default function Dashboard() {
 
             return (
               <div key={student.id}>
-                <Link href={`/students/${student.id}/profile`} className="block group">
+                {/* Card uses a clickable div, not <Link>, so the inner
+                    "Log this week" <Link> isn't an invalid nested <a>. */}
+                <div
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => setLocation(`/students/${student.id}/profile`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setLocation(`/students/${student.id}/profile`);
+                    }
+                  }}
+                  className="block group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl"
+                >
                   <div className={`bg-card rounded-2xl p-4 border hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 h-full flex flex-col relative overflow-hidden ${getGenderBorderClass(student.gender as Gender)} ${
                     student.thisWeekDone
                       ? "border-emerald-300/60 dark:border-emerald-700/40"
@@ -249,7 +263,7 @@ export default function Dashboard() {
                       </Link>
                     </div>
                   </div>
-                </Link>
+                </div>
               </div>
             );
           })}
