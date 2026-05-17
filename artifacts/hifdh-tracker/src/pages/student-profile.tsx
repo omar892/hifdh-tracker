@@ -191,15 +191,23 @@ export default function StudentProfile() {
             />
             <StatCard
               label="Success Rate"
-              value={`${stats.overallSuccessRate}%`}
-              sub="all time"
+              value={`${stats.successRate4Weeks}%`}
+              sub={`last 4 weeks · ${stats.overallSuccessRate}% all-time`}
               icon={TrendingUp}
               color="text-emerald-500"
             />
             <StatCard
               label="Current Streak"
-              value={`${stats.currentStreakWeeks}w`}
-              sub="consecutive weeks"
+              value={
+                stats.currentStreakWeeks === 0 && (stats.weeksSinceLastEntry ?? 0) > 2
+                  ? "Paused"
+                  : `${stats.currentStreakWeeks}w`
+              }
+              sub={
+                (stats.weeksSinceLastEntry ?? 0) > 2
+                  ? `last logged ${stats.weeksSinceLastEntry}w ago`
+                  : "consecutive weeks"
+              }
               icon={Flame}
               color="text-orange-500"
             />

@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.3.0
  */
 import type { AbsentStudent } from "./absentStudent";
+import type { ClassWeekStatus } from "./classWeekStatus";
 import type { MonthlyDecomposition } from "./monthlyDecomposition";
+import type { NotYetLogged } from "./notYetLogged";
 import type { RatingDistributionWeek } from "./ratingDistributionWeek";
 import type { StudentAttention } from "./studentAttention";
 import type { StudentPerformance } from "./studentPerformance";
@@ -19,8 +21,13 @@ import type { WeekTrend } from "./weekTrend";
 
 export interface ClassStats {
   totalStudents: number;
+  /** All-time average success rate across students. Historical lens. */
   averageSuccessRate: number;
+  /** Average success rate over the last 4 weeks. Only counts students who logged at least one entry in that window. */
+  averageSuccessRate4Weeks: number;
   totalLinesMemorized: number;
+  /** Average lines per student per week, scoped to last 4 weeks. */
+  avgLinesPerWeek4Weeks: number;
   avgLinesPerWeek: number;
   topPerformers: StudentPerformance[];
   needsAttention: StudentPerformance[];
@@ -40,4 +47,6 @@ export interface ClassStats {
   ratingDistributions: RatingDistributionWeek[];
   thisWeekSummary: ThisWeekSummary;
   absentStudents: AbsentStudent[];
+  notYetLogged: NotYetLogged[];
+  classWeekStatus: ClassWeekStatus;
 }

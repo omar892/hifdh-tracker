@@ -463,8 +463,27 @@ export const GetStudentStatsResponse = zod.object({
   totalLinesMemorized: zod.number(),
   totalQuranPercentage: zod.number(),
   juzCompleted: zod.number(),
-  overallSuccessRate: zod.number(),
-  currentStreakWeeks: zod.number(),
+  overallSuccessRate: zod
+    .number()
+    .describe(
+      "All-time successful-days \/ attended-days ratio. Historical lens, can mask recent decline.",
+    ),
+  successRate4Weeks: zod
+    .number()
+    .describe(
+      'Successful-days \/ attended-days over the last 4 weeks of entries. What \"how is this student doing now\" should answer.',
+    ),
+  currentStreakWeeks: zod
+    .number()
+    .describe(
+      "Consecutive weeks (counting back from most-recent entry) with ≥4 successful days. Returns 0 when the most-recent entry is more than 2 weeks stale.",
+    ),
+  weeksSinceLastEntry: zod
+    .number()
+    .nullish()
+    .describe(
+      "How many weeks ago the most-recent entry was logged (0 = this week). null if the student has no entries at all.",
+    ),
   linesThisMonth: zod.number(),
   linesLastMonth: zod.number(),
 });
@@ -587,8 +606,20 @@ export const GetDashboardResponse = zod.array(GetDashboardResponseItem);
  */
 export const GetClassStatsResponse = zod.object({
   totalStudents: zod.number(),
-  averageSuccessRate: zod.number(),
+  averageSuccessRate: zod
+    .number()
+    .describe(
+      "All-time average success rate across students. Historical lens.",
+    ),
+  averageSuccessRate4Weeks: zod
+    .number()
+    .describe(
+      "Average success rate over the last 4 weeks. Only counts students who logged at least one entry in that window.",
+    ),
   totalLinesMemorized: zod.number(),
+  avgLinesPerWeek4Weeks: zod
+    .number()
+    .describe("Average lines per student per week, scoped to last 4 weeks."),
   avgLinesPerWeek: zod.number(),
   topPerformers: zod.array(
     zod.object({
@@ -647,8 +678,13 @@ export const GetClassStatsResponse = zod.object({
     zod.object({
       studentId: zod.number(),
       name: zod.string(),
-      currentStreak: zod.number(),
+      currentStreak: zod
+        .number()
+        .describe(
+          "Stale-aware — returns 0 if the most-recent entry is more than 2 weeks old.",
+        ),
       best12WeekStreak: zod.number(),
+      weeksSinceLastEntry: zod.number().nullish(),
     }),
   ),
   linesThisMonth: zod.number(),
@@ -712,6 +748,27 @@ export const GetClassStatsResponse = zod.object({
       daysAttended: zod.number(),
     }),
   ),
+  notYetLogged: zod.array(
+    zod.object({
+      studentId: zod.number(),
+      name: zod.string(),
+    }),
+  ),
+  classWeekStatus: zod.object({
+    thisWeekMonday: zod.string().describe("ISO date of this week's Monday."),
+    weekPhase: zod
+      .enum(["early", "mid", "late"])
+      .describe(
+        "early = Mon-Wed (not logging yet is normal), mid = Thu (gentle nudge), late = Fri+ (should escalate).",
+      ),
+    unloggedCount: zod.number(),
+    totalStudents: zod.number(),
+    allUnlogged: zod
+      .boolean()
+      .describe(
+        "True when no student has logged for this week. UI uses this to collapse per-student warnings into one class-level message.",
+      ),
+  }),
 });
 
 /**

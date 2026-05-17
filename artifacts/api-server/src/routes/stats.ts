@@ -32,6 +32,44 @@ function getFridayOfWeek(mondayStr: string): string {
   return d.toISOString().split("T")[0];
 }
 
+/**
+ * Whole-week count between two Monday-anchored date strings (YYYY-MM-DD).
+ * Returns null when either side is missing.
+ */
+function weeksBetween(fromMondayStr: string | null | undefined, toMondayStr: string): number | null {
+  if (!fromMondayStr) return null;
+  const from = new Date(fromMondayStr + "T00:00:00Z").getTime();
+  const to = new Date(toMondayStr + "T00:00:00Z").getTime();
+  return Math.max(0, Math.round((to - from) / (7 * 24 * 60 * 60 * 1000)));
+}
+
+/**
+ * The streak shown to users only means anything if it INCLUDES recent weeks.
+ * If the most-recent entry is older than this many weeks, treat the streak as
+ * stale (return 0). 2 weeks lets a teacher log a week late without losing it.
+ */
+const STREAK_STALE_AFTER_WEEKS = 2;
+
+/**
+ * Walk recent entries from newest → oldest, counting consecutive weeks with
+ * ≥4 successful days. Returns 0 if the newest entry itself is stale, so an
+ * old streak doesn't keep displaying as current.
+ */
+function computeFreshStreak(
+  entriesDesc: { weekStartDate: string; successfulDays: number }[],
+  thisWeekMonday: string,
+): number {
+  if (entriesDesc.length === 0) return 0;
+  const weeksSince = weeksBetween(entriesDesc[0].weekStartDate, thisWeekMonday) ?? 0;
+  if (weeksSince > STREAK_STALE_AFTER_WEEKS) return 0;
+  let streak = 0;
+  for (const entry of entriesDesc) {
+    if (entry.successfulDays >= 4) streak++;
+    else break;
+  }
+  return streak;
+}
+
 function getWeeksInMonth(yearMonth: string): Array<{ weekStartDate: string; weekEndDate: string }> {
   const [year, month] = yearMonth.split("-").map(Number);
   const firstDay = new Date(Date.UTC(year, month - 1, 1));
@@ -81,14 +119,24 @@ router.get("/students/:studentId/stats", requireAuth, async (req, res) => {
       ? parseFloat(((totalSuccessfulDays / totalDaysAttended) * 100).toFixed(1))
       : 0;
 
-  let currentStreakWeeks = 0;
-  for (const entry of allEntries) {
-    if (entry.successfulDays >= 4) {
-      currentStreakWeeks++;
-    } else {
-      break;
-    }
-  }
+  const thisWeekMonday = getCurrentMonday();
+  // 4-week success rate — calendar-scoped so it answers "right now, how is
+  // this student doing?" A student who hasn't logged in 6+ weeks reads as 0%,
+  // which is the honest answer.
+  const fourWeeksAgoMondayStudent = (() => {
+    const d = new Date(thisWeekMonday + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() - 4 * 7);
+    return d.toISOString().split("T")[0];
+  })();
+  const last4WeekEntries = allEntries.filter((e) => e.weekStartDate >= fourWeeksAgoMondayStudent);
+  const days4w = last4WeekEntries.reduce((s, e) => s + e.daysAttended, 0);
+  const success4w = last4WeekEntries.reduce((s, e) => s + e.successfulDays, 0);
+  const successRate4Weeks = days4w > 0
+    ? parseFloat(((success4w / days4w) * 100).toFixed(1))
+    : 0;
+
+  const currentStreakWeeks = computeFreshStreak(allEntries, thisWeekMonday);
+  const weeksSinceLastEntry = weeksBetween(allEntries[0]?.weekStartDate, thisWeekMonday);
 
   const now = new Date();
   const thisMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -114,7 +162,9 @@ router.get("/students/:studentId/stats", requireAuth, async (req, res) => {
     totalQuranPercentage,
     juzCompleted,
     overallSuccessRate,
+    successRate4Weeks,
     currentStreakWeeks,
+    weeksSinceLastEntry,
     linesThisMonth,
     linesLastMonth,
   });
@@ -227,21 +277,17 @@ type EntryRow = {
   memorizationLines: number;
 };
 
+/**
+ * "Genuine concern" flags — performance signals teachers should actually
+ * think about. Excludes "missing this week's entry" which is its own state
+ * (handled by notYetLogged below).
+ */
 function computeAttentionFlags(
   recentEntries: EntryRow[],
-  thisWeekMonday: string,
 ): { type: string; label: string }[] {
   const flags: { type: string; label: string }[] = [];
   const last2 = recentEntries.slice(0, 2);
-  if (last2.length < 2) {
-    const now = new Date();
-    const dayOfWeek = now.getUTCDay();
-    const isThursdayOrLater = dayOfWeek === 0 || dayOfWeek >= 4;
-    if (isThursdayOrLater && (last2.length === 0 || last2[0].weekStartDate !== thisWeekMonday)) {
-      flags.push({ type: "missing_entry", label: "No entry this week" });
-    }
-    return flags;
-  }
+  if (last2.length < 2) return flags;
 
   const bothLowSuccess = last2.every((e) => {
     const rate = e.daysAttended > 0 ? e.successfulDays / e.daysAttended : 0;
@@ -258,7 +304,7 @@ function computeAttentionFlags(
     flags.push({ type: "rating_decline", label: "2-week rating concern" });
   }
 
-  if (last2.length >= 2 && last2[0].weekRating && last2[1].weekRating) {
+  if (last2[0].weekRating && last2[1].weekRating) {
     const prevTier = RATING_TIERS[last2[1].weekRating] ?? 3;
     const currTier = RATING_TIERS[last2[0].weekRating] ?? 3;
     if (prevTier - currTier >= 2) {
@@ -271,14 +317,19 @@ function computeAttentionFlags(
     flags.push({ type: "attendance_drop", label: "Attendance drop" });
   }
 
-  const now = new Date();
-  const dayOfWeek = now.getUTCDay();
-  const isThursdayOrLater = dayOfWeek === 0 || dayOfWeek >= 4;
-  if (isThursdayOrLater && last2[0].weekStartDate !== thisWeekMonday) {
-    flags.push({ type: "missing_entry", label: "No entry this week" });
-  }
-
   return flags;
+}
+
+/**
+ * Day-of-week phase used to decide whether "not yet logged this week" is
+ * a calm informational state or worth escalating. Mon–Wed early; Thu mid;
+ * Fri+ late.
+ */
+function getWeekPhase(): "early" | "mid" | "late" {
+  const day = new Date().getUTCDay(); // 0=Sun, 1=Mon, ...
+  if (day === 0 || day >= 5) return "late"; // Fri, Sat, Sun
+  if (day === 4) return "mid"; // Thu
+  return "early"; // Mon-Wed
 }
 
 /* ── Spotlight logic ──────────────────────────────── */
@@ -486,7 +537,7 @@ router.get("/stats/class", requireAuth, async (req, res) => {
   const studentStats: { studentId: number; name: string; successRate: number }[] = [];
   const studentProgressList: { studentId: number; name: string; totalLines: number; totalJuz: number; weeklyPace: number }[] = [];
   const attentionFlags: { studentId: number; name: string; flags: { type: string; label: string }[] }[] = [];
-  const streakList: { studentId: number; name: string; currentStreak: number; best12WeekStreak: number }[] = [];
+  const streakList: { studentId: number; name: string; currentStreak: number; best12WeekStreak: number; weeksSinceLastEntry: number | null }[] = [];
   const rankingData: { studentId: number; name: string; successRate4w: number; weeklyPace4w: number; consistency4w: number }[] = [];
 
   let classLinesThisMonth = 0;
@@ -522,16 +573,13 @@ router.get("/stats/class", requireAuth, async (req, res) => {
       weeklyPace,
     });
 
-    const flags = computeAttentionFlags(entries, thisWeekMonday);
+    const flags = computeAttentionFlags(entries);
     if (flags.length > 0) {
       attentionFlags.push({ studentId: student.id, name: student.name, flags });
     }
 
-    let currentStreak = 0;
-    for (const entry of entries) {
-      if (entry.successfulDays >= 4) currentStreak++;
-      else break;
-    }
+    const currentStreak = computeFreshStreak(entries, thisWeekMonday);
+    const weeksSinceLast = weeksBetween(entries[0]?.weekStartDate, thisWeekMonday);
 
     const last12 = entries.slice(0, 12);
     let best12 = 0;
@@ -550,6 +598,7 @@ router.get("/stats/class", requireAuth, async (req, res) => {
       name: student.name,
       currentStreak,
       best12WeekStreak: best12,
+      weeksSinceLastEntry: weeksSinceLast,
     });
 
     const last4Entries = entries.slice(0, 4);
@@ -646,6 +695,28 @@ router.get("/stats/class", requireAuth, async (req, res) => {
     allWeeklyEntries.length > 0
       ? parseFloat((allWeeklyEntries.reduce((s, e) => s + e.memorizationLines, 0) / allWeeklyEntries.length).toFixed(1))
       : 0;
+
+  // 4-week class averages — scoped to actual calendar weeks, not "last 4
+  // entries per student." A student who last logged 6 weeks ago contributes
+  // 0 to both metrics (since they have no recent entries), which is the
+  // honest answer to "how is the class doing right now?"
+  const fourWeeksAgoMonday = (() => {
+    const d = new Date(thisWeekMonday + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() - 4 * 7);
+    return d.toISOString().split("T")[0];
+  })();
+  const entriesInLast4Weeks = allWeeklyEntries.filter((e) => e.weekStartDate >= fourWeeksAgoMonday);
+  const days4wTotal = entriesInLast4Weeks.reduce((s, e) => s + e.daysAttended, 0);
+  const success4wTotal = entriesInLast4Weeks.reduce((s, e) => s + e.successfulDays, 0);
+  const averageSuccessRate4Weeks = days4wTotal > 0
+    ? parseFloat(((success4wTotal / days4wTotal) * 100).toFixed(1))
+    : 0;
+  // lines / week / student over the last 4 calendar weeks, averaged across
+  // all *currently active* students (not just those who logged)
+  const lines4wTotal = entriesInLast4Weeks.reduce((s, e) => s + e.memorizationLines, 0);
+  const avgLinesPerWeek4Weeks = students.length > 0
+    ? parseFloat((lines4wTotal / students.length / 4).toFixed(1))
+    : 0;
 
   studentProgressList.sort((a, b) => b.totalLines - a.totalLines);
   streakList.sort((a, b) => b.currentStreak - a.currentStreak || b.best12WeekStreak - a.best12WeekStreak);
@@ -758,11 +829,32 @@ router.get("/stats/class", requireAuth, async (req, res) => {
   }
   absentStudents.sort((a, b) => a.daysAttended - b.daysAttended);
 
+  // ── notYetLogged + classWeekStatus ──
+  // "Has this student logged this week's entry?" is a separate concept from
+  // "is this student struggling?". We surface it in its own list so the
+  // Needs Attention list stays for genuine concern signals.
+  const notYetLogged: { studentId: number; name: string }[] = [];
+  for (const student of students) {
+    if (!thisWeekStudentEntries.has(student.id)) {
+      notYetLogged.push({ studentId: student.id, name: student.name });
+    }
+  }
+  const weekPhase = getWeekPhase();
+  const classWeekStatus = {
+    thisWeekMonday,
+    weekPhase, // "early" Mon-Wed, "mid" Thu, "late" Fri+
+    unloggedCount: notYetLogged.length,
+    totalStudents: students.length,
+    allUnlogged: notYetLogged.length === students.length && students.length > 0,
+  };
+
   res.json({
     totalStudents: students.length,
     averageSuccessRate: avgRate,
+    averageSuccessRate4Weeks,
     totalLinesMemorized,
     avgLinesPerWeek: avgLinesPerWeek,
+    avgLinesPerWeek4Weeks,
     topPerformers: studentStats.slice(0, 3),
     needsAttention: studentStats.filter((s) => s.successRate < 70).slice(0, 3),
     studentProgress: studentProgressList,
@@ -781,6 +873,8 @@ router.get("/stats/class", requireAuth, async (req, res) => {
     ratingDistributions,
     thisWeekSummary,
     absentStudents,
+    notYetLogged,
+    classWeekStatus,
   });
 });
 

@@ -213,8 +213,14 @@ export interface StudentStats {
   totalLinesMemorized: number;
   totalQuranPercentage: number;
   juzCompleted: number;
+  /** All-time successful-days / attended-days ratio. Historical lens, can mask recent decline. */
   overallSuccessRate: number;
+  /** Successful-days / attended-days over the last 4 weeks of entries. What "how is this student doing now" should answer. */
+  successRate4Weeks: number;
+  /** Consecutive weeks (counting back from most-recent entry) with ≥4 successful days. Returns 0 when the most-recent entry is more than 2 weeks stale. */
   currentStreakWeeks: number;
+  /** How many weeks ago the most-recent entry was logged (0 = this week). null if the student has no entries at all. */
+  weeksSinceLastEntry?: number | null;
   linesThisMonth: number;
   linesLastMonth: number;
 }
@@ -257,6 +263,34 @@ export interface DashboardStudent {
   thisWeekDone: boolean;
   thisWeekEntry?: WeeklyEntry | null;
   completedJuz: number[];
+}
+
+export interface NotYetLogged {
+  studentId: number;
+  name: string;
+}
+
+/**
+ * early = Mon-Wed (not logging yet is normal), mid = Thu (gentle nudge), late = Fri+ (should escalate).
+ */
+export type ClassWeekStatusWeekPhase =
+  (typeof ClassWeekStatusWeekPhase)[keyof typeof ClassWeekStatusWeekPhase];
+
+export const ClassWeekStatusWeekPhase = {
+  early: "early",
+  mid: "mid",
+  late: "late",
+} as const;
+
+export interface ClassWeekStatus {
+  /** ISO date of this week's Monday. */
+  thisWeekMonday: string;
+  /** early = Mon-Wed (not logging yet is normal), mid = Thu (gentle nudge), late = Fri+ (should escalate). */
+  weekPhase: ClassWeekStatusWeekPhase;
+  unloggedCount: number;
+  totalStudents: number;
+  /** True when no student has logged for this week. UI uses this to collapse per-student warnings into one class-level message. */
+  allUnlogged: boolean;
 }
 
 export interface StudentPerformance {
@@ -303,8 +337,10 @@ export interface WeekTrend {
 export interface StudentStreak {
   studentId: number;
   name: string;
+  /** Stale-aware — returns 0 if the most-recent entry is more than 2 weeks old. */
   currentStreak: number;
   best12WeekStreak: number;
+  weeksSinceLastEntry?: number | null;
 }
 
 export type StudentSpotlightType =
@@ -378,8 +414,13 @@ export interface AbsentStudent {
 
 export interface ClassStats {
   totalStudents: number;
+  /** All-time average success rate across students. Historical lens. */
   averageSuccessRate: number;
+  /** Average success rate over the last 4 weeks. Only counts students who logged at least one entry in that window. */
+  averageSuccessRate4Weeks: number;
   totalLinesMemorized: number;
+  /** Average lines per student per week, scoped to last 4 weeks. */
+  avgLinesPerWeek4Weeks: number;
   avgLinesPerWeek: number;
   topPerformers: StudentPerformance[];
   needsAttention: StudentPerformance[];
@@ -399,6 +440,8 @@ export interface ClassStats {
   ratingDistributions: RatingDistributionWeek[];
   thisWeekSummary: ThisWeekSummary;
   absentStudents: AbsentStudent[];
+  notYetLogged: NotYetLogged[];
+  classWeekStatus: ClassWeekStatus;
 }
 
 export interface Surah {

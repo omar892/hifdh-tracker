@@ -655,7 +655,7 @@ components:
 
     StudentStats:
       type: object
-      required: [totalLinesMemorized, totalQuranPercentage, juzCompleted, overallSuccessRate, currentStreakWeeks, linesThisMonth, linesLastMonth]
+      required: [totalLinesMemorized, totalQuranPercentage, juzCompleted, overallSuccessRate, successRate4Weeks, currentStreakWeeks, linesThisMonth, linesLastMonth]
       properties:
         totalLinesMemorized:
           type: integer
@@ -665,8 +665,17 @@ components:
           type: number
         overallSuccessRate:
           type: number
+          description: All-time successful-days / attended-days ratio. Historical lens, can mask recent decline.
+        successRate4Weeks:
+          type: number
+          description: Successful-days / attended-days over the last 4 weeks of entries. What "how is this student doing now" should answer.
         currentStreakWeeks:
           type: integer
+          description: Consecutive weeks (counting back from most-recent entry) with ≥4 successful days. Returns 0 when the most-recent entry is more than 2 weeks stale.
+        weeksSinceLastEntry:
+          type: integer
+          nullable: true
+          description: How many weeks ago the most-recent entry was logged (0 = this week). null if the student has no entries at all.
         linesThisMonth:
           type: integer
         linesLastMonth:
@@ -743,16 +752,51 @@ components:
           items:
             type: integer
 
+    NotYetLogged:
+      type: object
+      required: [studentId, name]
+      properties:
+        studentId:
+          type: integer
+        name:
+          type: string
+
+    ClassWeekStatus:
+      type: object
+      required: [thisWeekMonday, weekPhase, unloggedCount, totalStudents, allUnlogged]
+      properties:
+        thisWeekMonday:
+          type: string
+          description: ISO date of this week's Monday.
+        weekPhase:
+          type: string
+          enum: [early, mid, late]
+          description: early = Mon-Wed (not logging yet is normal), mid = Thu (gentle nudge), late = Fri+ (should escalate).
+        unloggedCount:
+          type: integer
+        totalStudents:
+          type: integer
+        allUnlogged:
+          type: boolean
+          description: True when no student has logged for this week. UI uses this to collapse per-student warnings into one class-level message.
+
     ClassStats:
       type: object
-      required: [totalStudents, averageSuccessRate, totalLinesMemorized, avgLinesPerWeek, topPerformers, needsAttention, studentProgress, studentRankings, attentionFlags, weeklyTrends, streakLeaderboard, linesThisMonth, linesLastMonth, activeStudentsThisMonth, activeStudentsLastMonth, avgLinesPerStudentThisMonth, avgLinesPerStudentLastMonth, spotlights, monthlyDecomposition, ratingDistributions, thisWeekSummary, absentStudents]
+      required: [totalStudents, averageSuccessRate, averageSuccessRate4Weeks, totalLinesMemorized, avgLinesPerWeek, avgLinesPerWeek4Weeks, topPerformers, needsAttention, studentProgress, studentRankings, attentionFlags, weeklyTrends, streakLeaderboard, linesThisMonth, linesLastMonth, activeStudentsThisMonth, activeStudentsLastMonth, avgLinesPerStudentThisMonth, avgLinesPerStudentLastMonth, spotlights, monthlyDecomposition, ratingDistributions, thisWeekSummary, absentStudents, notYetLogged, classWeekStatus]
       properties:
         totalStudents:
           type: integer
         averageSuccessRate:
           type: number
+          description: All-time average success rate across students. Historical lens.
+        averageSuccessRate4Weeks:
+          type: number
+          description: Average success rate over the last 4 weeks. Only counts students who logged at least one entry in that window.
         totalLinesMemorized:
           type: integer
+        avgLinesPerWeek4Weeks:
+          type: number
+          description: Average lines per student per week, scoped to last 4 weeks.
         avgLinesPerWeek:
           type: number
         topPerformers:
@@ -811,6 +855,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AbsentStudent"
+        notYetLogged:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotYetLogged"
+        classWeekStatus:
+          $ref: "#/components/schemas/ClassWeekStatus"
 
     StudentPerformance:
       type: object
@@ -900,8 +950,12 @@ components:
           type: string
         currentStreak:
           type: integer
+          description: Stale-aware — returns 0 if the most-recent entry is more than 2 weeks old.
         best12WeekStreak:
           type: integer
+        weeksSinceLastEntry:
+          type: integer
+          nullable: true
 
     Surah:
       type: object

@@ -64,14 +64,20 @@ function Section({ children, delay = 0 }: { children: React.ReactNode; delay?: n
 
 function StatCard({
   label,
+  scope,
   value,
   sub,
+  secondary,
   icon: Icon,
   color = "text-primary",
 }: {
   label: string;
+  /** Time window the headline value covers — e.g. "Last 4 weeks", "All-time" */
+  scope?: string;
   value: string | number;
   sub?: string;
+  /** Optional smaller value below for the alternate time window */
+  secondary?: { label: string; value: string | number };
   icon: React.ElementType;
   color?: string;
 }) {
@@ -82,7 +88,14 @@ function StatCard({
         <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
       </div>
       <div className="text-4xl font-display font-bold text-foreground">{value}</div>
+      {scope && <div className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider mt-0.5">{scope}</div>}
       {sub && <div className="text-sm text-muted-foreground mt-1">{sub}</div>}
+      {secondary && (
+        <div className="text-xs text-muted-foreground/70 mt-2 pt-2 border-t border-border/30">
+          <span className="font-bold text-foreground/70">{secondary.value}</span>{" "}
+          <span>{secondary.label}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -144,10 +157,38 @@ export default function ClassStats() {
 
         {/* ── Stat Cards ── */}
         <Section delay={0.05}><div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <StatCard label="Active Students" value={stats?.totalStudents ?? 0} icon={Users} color="text-primary" />
-          <StatCard label="Avg Success Rate" value={`${stats?.averageSuccessRate ?? 0}%`} sub="days successful" icon={TrendingUp} color="text-emerald-500" />
-          <StatCard label="Total Lines" value={(stats?.totalLinesMemorized ?? 0).toLocaleString()} sub="memorized across class" icon={BookOpen} color="text-blue-500" />
-          <StatCard label="Avg / Week" value={stats?.avgLinesPerWeek ?? 0} sub="lines per student per week" icon={BarChart3} color="text-purple-500" />
+          <StatCard
+            label="Active Students"
+            value={stats?.totalStudents ?? 0}
+            icon={Users}
+            color="text-primary"
+          />
+          <StatCard
+            label="Success Rate"
+            scope="Last 4 weeks"
+            value={`${stats?.averageSuccessRate4Weeks ?? 0}%`}
+            sub="days successful"
+            secondary={{ value: `${stats?.averageSuccessRate ?? 0}%`, label: "all-time" }}
+            icon={TrendingUp}
+            color="text-emerald-500"
+          />
+          <StatCard
+            label="Lines Memorized"
+            scope="All-time (from completed juz)"
+            value={(stats?.totalLinesMemorized ?? 0).toLocaleString()}
+            sub="across the class"
+            icon={BookOpen}
+            color="text-blue-500"
+          />
+          <StatCard
+            label="Lines / Week"
+            scope="Last 4 weeks"
+            value={stats?.avgLinesPerWeek4Weeks ?? 0}
+            sub="per student"
+            secondary={{ value: stats?.avgLinesPerWeek ?? 0, label: "all-time" }}
+            icon={BarChart3}
+            color="text-purple-500"
+          />
         </div></Section>
 
         {/* ── Weekly Trends Charts ── */}
@@ -436,16 +477,16 @@ export default function ClassStats() {
             )}
           </div>
 
-          {/* Needs Attention (intelligent flags) */}
+          {/* Needs Attention (intelligent flags — genuine concerns only) */}
           <div className="bg-card rounded-3xl border border-border/50 shadow-sm p-6">
             <h2 className="font-display font-bold text-xl text-foreground flex items-center gap-2 mb-5">
               <AlertTriangle className="w-5 h-5 text-orange-500" /> Needs Attention
             </h2>
             {(stats?.attentionFlags ?? []).length === 0 ? (
               <div>
-                <p className="text-muted-foreground italic">All students are doing well!</p>
+                <p className="text-muted-foreground italic">No concerns to flag.</p>
                 <p className="text-[11px] text-muted-foreground mt-2">
-                  No flags triggered. Checking: success rate, ratings, scores, and attendance over the last 2 weeks.
+                  Checking success rate, ratings, and attendance over the last 2 weeks. Students who haven&apos;t logged this week are shown separately.
                 </p>
               </div>
             ) : (
@@ -474,6 +515,49 @@ export default function ClassStats() {
                 ))}
               </div>
             )}
+
+            {/* Not Yet Logged — separate from concerns. Calm Mon-Wed,
+                gentle Thu, escalates Fri+. Collapses to class-level when all unlogged. */}
+            {(stats?.notYetLogged?.length ?? 0) > 0 && stats?.classWeekStatus && (() => {
+              const cws = stats.classWeekStatus;
+              const phase = cws.weekPhase;
+              const allUnlogged = cws.allUnlogged;
+              const tone = phase === "late" ? "amber" : phase === "mid" ? "muted-strong" : "muted";
+              const wrapClass =
+                tone === "amber"
+                  ? "border-amber-200 dark:border-amber-800/50 bg-amber-500/5"
+                  : "border-border/50 bg-muted/30";
+              const labelClass =
+                tone === "amber"
+                  ? "text-amber-700 dark:text-amber-300"
+                  : tone === "muted-strong"
+                  ? "text-foreground"
+                  : "text-muted-foreground";
+              return (
+                <div className={`mt-5 pt-5 border-t border-border/30`}>
+                  <div className={`rounded-xl border p-3 ${wrapClass}`}>
+                    <p className={`text-xs font-bold uppercase tracking-wider ${labelClass}`}>
+                      {allUnlogged ? "No entries yet this week" : "Not yet logged this week"}
+                    </p>
+                    {allUnlogged ? (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {cws.unloggedCount} of {cws.totalStudents} students. {phase === "late" ? "It's late in the week — log entries today." : phase === "mid" ? "Friday is tomorrow." : "Normal early-week state."}
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {stats.notYetLogged.map((s) => (
+                          <StudentLink key={s.studentId} id={s.studentId}>
+                            <span className="text-xs font-medium px-2 py-1 rounded-full bg-background border border-border/50 text-foreground hover:border-primary/50">
+                              {s.name}
+                            </span>
+                          </StudentLink>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
         </Section>
@@ -539,21 +623,32 @@ export default function ClassStats() {
                       <span className="w-16 text-center">Best (12wk)</span>
                     </div>
                     <div className="space-y-2">
-                      {stats!.streakLeaderboard.map((s) => (
+                      {stats!.streakLeaderboard.map((s) => {
+                        const stale = (s.weeksSinceLastEntry ?? 0) > 2;
+                        return (
                         <StudentLink key={s.studentId} id={s.studentId}>
                           <div className="flex items-center gap-3">
                             <div className="flex-1 min-w-0">
                               <p className="font-semibold text-foreground text-sm truncate">{s.name}</p>
+                              {stale && (
+                                <p className="text-[10px] text-muted-foreground/80 font-medium">
+                                  Paused &middot; last logged {s.weeksSinceLastEntry}w ago
+                                </p>
+                              )}
                             </div>
                             <div className="w-16 text-center">
                               <span className={`text-sm font-bold whitespace-nowrap ${
-                                s.currentStreak >= 3
+                                stale
+                                  ? "text-muted-foreground"
+                                  : s.currentStreak >= 3
                                   ? "text-orange-600 dark:text-orange-400"
                                   : s.currentStreak === 0
                                   ? "text-muted-foreground"
                                   : "text-foreground"
                               }`}>
-                                {s.currentStreak === 0 ? (
+                                {stale ? (
+                                  <Snowflake className="w-4 h-4 inline text-muted-foreground/60" />
+                                ) : s.currentStreak === 0 ? (
                                   <Snowflake className="w-4 h-4 inline text-blue-400" />
                                 ) : s.currentStreak >= 3 ? (
                                   <>{"\uD83D\uDD25"} {s.currentStreak}</>
@@ -569,7 +664,8 @@ export default function ClassStats() {
                             </div>
                           </div>
                         </StudentLink>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}

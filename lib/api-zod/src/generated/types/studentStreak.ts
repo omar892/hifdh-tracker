@@ -9,6 +9,8 @@
 export interface StudentStreak {
   studentId: number;
   name: string;
+  /** Stale-aware — returns 0 if the most-recent entry is more than 2 weeks old. */
   currentStreak: number;
   best12WeekStreak: number;
+  weeksSinceLastEntry?: number | null;
 }

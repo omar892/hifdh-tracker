@@ -3,10 +3,18 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { useGetDashboard } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { format, startOfWeek, addDays, getDay } from "date-fns";
-import { CheckCircle2, Clock, BookOpen, Play, Pencil } from "lucide-react";
+import { CheckCircle2, Clock, BookOpen, Play, Pencil, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { TOTAL_PAGES, getLinesForCompletedJuz, TOTAL_LINES } from "@/lib/quran-utils";
 import { getGenderAvatarClass, getGenderBorderClass, type Gender } from "@/lib/gender-colors";
+
+/** Mon-Wed = early (normal to be unlogged), Thu = mid, Fri+ = late (alarm). */
+function getWeekPhase(): "early" | "mid" | "late" {
+  const d = getDay(new Date()); // 0=Sun
+  if (d === 0 || d >= 5) return "late";
+  if (d === 4) return "mid";
+  return "early";
+}
 
 function WeekDots() {
   const now = new Date();
@@ -61,6 +69,8 @@ export default function Dashboard() {
   const doneCount = students?.filter((s) => s.thisWeekDone).length ?? 0;
   const totalCount = students?.length ?? 0;
   const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+  const weekPhase = getWeekPhase();
+  const allUnlogged = totalCount > 0 && doneCount === 0;
 
   return (
     <AppLayout title="Dashboard">
@@ -112,6 +122,39 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Class-level banner when everyone's unlogged. Tone depends on week phase. */}
+      {allUnlogged && (
+        <div
+          className={`mb-6 flex items-start gap-3 p-4 rounded-2xl border ${
+            weekPhase === "late"
+              ? "bg-amber-500/5 border-amber-200 dark:border-amber-800/50"
+              : weekPhase === "mid"
+              ? "bg-muted/40 border-border"
+              : "bg-muted/30 border-border/50"
+          }`}
+        >
+          {weekPhase === "late" ? (
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          ) : (
+            <Clock className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1">
+            <p className={`text-sm font-bold ${
+              weekPhase === "late" ? "text-amber-700 dark:text-amber-300" : "text-foreground"
+            }`}>
+              No entries yet for {weekRange}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {weekPhase === "late"
+                ? "It’s late in the week — log entries today."
+                : weekPhase === "mid"
+                ? "Friday is tomorrow."
+                : "Normal early-week state. No need to log yet."}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Empty state */}
       {totalCount === 0 ? (
         <div className="text-center p-12 bg-card rounded-3xl border border-border/50">
@@ -159,10 +202,19 @@ export default function Dashboard() {
                           <CheckCircle2 className="w-3 h-3" />
                           Done
                         </span>
-                      ) : (
+                      ) : weekPhase === "early" ? (
+                        // Mon–Wed: not having logged yet is normal. Stay silent — no badge.
+                        null
+                      ) : weekPhase === "mid" ? (
                         <span className="flex items-center gap-1 px-2 py-0.5 bg-muted text-muted-foreground rounded-full text-[10px] font-bold shrink-0">
                           <Clock className="w-3 h-3" />
-                          Pending
+                          Not yet
+                        </span>
+                      ) : (
+                        // Fri+: real signal
+                        <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-full text-[10px] font-extrabold shrink-0">
+                          <AlertCircle className="w-3 h-3" />
+                          Missing
                         </span>
                       )}
                     </div>

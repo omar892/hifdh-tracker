@@ -10,8 +10,14 @@ export interface StudentStats {
   totalLinesMemorized: number;
   totalQuranPercentage: number;
   juzCompleted: number;
+  /** All-time successful-days / attended-days ratio. Historical lens, can mask recent decline. */
   overallSuccessRate: number;
+  /** Successful-days / attended-days over the last 4 weeks of entries. What "how is this student doing now" should answer. */
+  successRate4Weeks: number;
+  /** Consecutive weeks (counting back from most-recent entry) with ≥4 successful days. Returns 0 when the most-recent entry is more than 2 weeks stale. */
   currentStreakWeeks: number;
+  /** How many weeks ago the most-recent entry was logged (0 = this week). null if the student has no entries at all. */
+  weeksSinceLastEntry?: number | null;
   linesThisMonth: number;
   linesLastMonth: number;
 }
