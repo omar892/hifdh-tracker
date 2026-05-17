@@ -24,6 +24,7 @@ import {
   Search,
   Copy,
   Check,
+  X,
   Mic,
   MicOff,
   Sparkles,
@@ -49,6 +50,109 @@ const WEEK_RATINGS = [
 ];
 
 const EMPTY_5 = (): boolean[] => [false, false, false, false, false];
+const FULL_5 = (): boolean[] => [true, true, true, true, true];
+
+/* ── Day chip — one per weekday ───────────────────── */
+
+interface DayChipProps {
+  label: string;          // Mon, Tue, ...
+  sabaq: boolean;
+  rmv: boolean;
+  review: boolean;
+  absent: boolean;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onChange: (patch: { sabaq?: boolean; rmv?: boolean; review?: boolean; absent?: boolean }) => void;
+}
+
+function DayChip({ label, sabaq, rmv, review, absent, expanded, onToggleExpand, onChange }: DayChipProps) {
+  // Visual state summary
+  const tasks = [sabaq, rmv, review];
+  const score = tasks.filter(Boolean).length;
+  const done = !absent && score === 3;
+  const partial = !absent && score > 0 && score < 3;
+  const empty = !absent && score === 0;
+
+  // Outer chip styling
+  const chipClass = absent
+    ? "bg-zinc-100 dark:bg-zinc-800/40 border-zinc-300/50 dark:border-zinc-700/50"
+    : done
+    ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300/60 dark:border-emerald-700/40"
+    : partial
+    ? "bg-amber-50 dark:bg-amber-950/20 border-amber-300/50 dark:border-amber-700/40"
+    : "bg-red-50 dark:bg-red-950/20 border-red-200/60 dark:border-red-800/40";
+
+  const summaryText = absent ? "Absent" : done ? "All 3" : empty ? "None" : `${score}/3`;
+  const summaryColor = absent
+    ? "text-muted-foreground"
+    : done
+    ? "text-emerald-700 dark:text-emerald-300"
+    : partial
+    ? "text-amber-700 dark:text-amber-300"
+    : "text-red-700 dark:text-red-300";
+
+  // Small dot row for the closed-state preview
+  const Dot = ({ on }: { on: boolean }) => (
+    <span className={`inline-block w-1.5 h-1.5 rounded-full ${on ? "bg-current" : "bg-current/20"}`} />
+  );
+
+  return (
+    <div className={`rounded-xl border-2 ${chipClass} transition-all`}>
+      <button
+        type="button"
+        onClick={onToggleExpand}
+        className="w-full flex items-center justify-between px-2.5 py-2 text-left"
+      >
+        <div className="flex flex-col">
+          <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest">{label}</span>
+          <span className={`text-xs font-bold ${summaryColor}`}>{summaryText}</span>
+        </div>
+        {!absent && (
+          <div className={`flex items-center gap-1 ${summaryColor}`}>
+            <Dot on={sabaq} /><Dot on={rmv} /><Dot on={review} />
+          </div>
+        )}
+      </button>
+      {expanded && (
+        <div className="border-t border-current/10 px-2 py-2 space-y-1.5">
+          {(["sabaq", "rmv", "review"] as const).map((key) => {
+            const labels = { sabaq: "Sabaq", rmv: "RMV", review: "Review" };
+            const value = key === "sabaq" ? sabaq : key === "rmv" ? rmv : review;
+            return (
+              <button
+                key={key}
+                type="button"
+                disabled={absent}
+                onClick={() => onChange({ [key]: !value })}
+                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-md text-xs font-bold transition-all ${
+                  absent
+                    ? "opacity-40 cursor-not-allowed"
+                    : value
+                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
+                    : "bg-secondary text-muted-foreground hover:bg-secondary/70"
+                }`}
+              >
+                <span>{labels[key]}</span>
+                {value ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : <X className="w-3.5 h-3.5" strokeWidth={3} />}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => onChange({ absent: !absent })}
+            className={`w-full text-[10px] font-bold uppercase tracking-wider px-2 py-1.5 rounded-md transition-all ${
+              absent
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15"
+                : "bg-zinc-500/10 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-500/15"
+            }`}
+          >
+            {absent ? "Mark present" : "Mark absent"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ── Helpers ──────────────────────────────────────── */
 
@@ -196,9 +300,11 @@ export default function LogWeek() {
   const [memorizationLines, setMemorizationLines] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [currentLine, setCurrentLine] = useState(1);
-  const [dailySabaq, setDailySabaq] = useState<boolean[]>(EMPTY_5());
-  const [dailyRmv, setDailyRmv] = useState<boolean[]>(EMPTY_5());
-  const [dailyReview, setDailyReview] = useState<boolean[]>(EMPTY_5());
+  // Default the daily grid to "everything went well." Teacher only taps to mark
+  // exceptions (absent / missed task) — far less input for a normal week.
+  const [dailySabaq, setDailySabaq] = useState<boolean[]>(FULL_5());
+  const [dailyRmv, setDailyRmv] = useState<boolean[]>(FULL_5());
+  const [dailyReview, setDailyReview] = useState<boolean[]>(FULL_5());
   const [dailyAbsent, setDailyAbsent] = useState<boolean[]>(EMPTY_5());
   const [rmvAmount, setRmvAmount] = useState("");
   const [reviewAmount, setReviewAmount] = useState("");
@@ -206,6 +312,8 @@ export default function LogWeek() {
   const [notes, setNotes] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  // Per-day expansion: only the day the teacher is editing is open.
+  const [expandedDay, setExpandedDay] = useState<number | null>(null);
 
   // AI entry state
   const [entryMode, setEntryMode] = useState<EntryMode>(() => {
@@ -554,9 +662,11 @@ export default function LogWeek() {
       setMemorizationLines(0);
       setCurrentPage(student.currentPage ?? 1);
       setCurrentLine(student.currentLine ?? 1);
-      setDailySabaq(EMPTY_5());
-      setDailyRmv(EMPTY_5());
-      setDailyReview(EMPTY_5());
+      // Assume-normal default: all three tasks done every day. Teacher
+      // un-checks any exception.
+      setDailySabaq(FULL_5());
+      setDailyRmv(FULL_5());
+      setDailyReview(FULL_5());
       setDailyAbsent(EMPTY_5());
       setRmvAmount(lastEntry?.rmvAmount ?? "");
       setReviewAmount(lastEntry?.reviewAmount ?? "");
@@ -734,16 +844,10 @@ export default function LogWeek() {
             </button>
           </div>
 
-          {/* Copy / edit badge */}
+          {/* Edit badge — "Same as last week" moved to primary button alongside Save */}
           <div className="flex items-center gap-2 shrink-0">
             {existingEntry && (
               <span className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">editing</span>
-            )}
-            {lastEntry && !existingEntry && (
-              <button type="button" onClick={handleCopyLastWeek}
-                className="flex items-center gap-1 text-xs font-bold text-primary/70 hover:text-primary transition-colors">
-                <Copy className="w-3 h-3" /> Copy last
-              </button>
             )}
           </div>
         </div>
@@ -1092,105 +1196,37 @@ export default function LogWeek() {
           </div>
         </div>
 
-        {/* ── Daily Grid ── */}
+        {/* ── Daily chips ── Assume-normal default: tap a day only when
+              something didn't go as expected. Chips expand inline. */}
         <div className={`bg-card rounded-2xl border border-border/50 p-3 mb-3 shadow-sm ${aiBorderClass("dailyGrid")}`}>
-          {isAiFilled("dailyGrid") && (
-            <div className="flex items-center gap-1 mb-2">
-              <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">AI</span>
-              <span className="text-[10px] text-muted-foreground">Tap any cell to adjust</span>
-            </div>
-          )}
-          <table className="w-full">
-            <thead>
-              <tr>
-                <th className="w-20" />
-                {DAYS.map((day, i) => (
-                  <th key={day} className="text-center pb-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleAbsent(i)}
-                      className={`text-[10px] font-extrabold uppercase tracking-widest px-2 py-1 rounded-lg transition-all ${
-                        dailyAbsent[i]
-                          ? "bg-zinc-500/15 text-zinc-400 line-through"
-                          : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                      }`}
-                      title={dailyAbsent[i] ? "Mark present" : "Mark absent"}
-                    >
-                      {dailyAbsent[i] ? "A" : day}
-                    </button>
-                  </th>
-                ))}
-                <th className="text-center pb-2 w-14">
-                  <span className="text-[9px] font-extrabold text-muted-foreground/60 uppercase tracking-widest">/5</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {ROWS.map((row) => {
-                const arr = row === "Memorization" ? dailySabaq : row === "RMV" ? dailyRmv : dailyReview;
-                const setter = row === "Memorization" ? setDailySabaq : row === "RMV" ? setDailyRmv : setDailyReview;
-                const total = rowTotal(arr);
-                return (
-                  <tr key={row} className="border-t border-border/20">
-                    <td className="py-1.5 pr-2">
-                      <span className="text-xs font-bold text-foreground">{row}</span>
-                    </td>
-                    {DAYS.map((_, i) => {
-                      const absent = dailyAbsent[i];
-                      const checked = arr[i];
-                      return (
-                        <td key={i} className="text-center py-1.5">
-                          <button
-                            type="button"
-                            disabled={absent}
-                            onClick={() => toggle(arr, i, setter)}
-                            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90 mx-auto ${
-                              absent
-                                ? "bg-zinc-500/8 cursor-not-allowed"
-                                : checked
-                                ? "bg-emerald-500/12 border-2 border-emerald-500 text-emerald-600 dark:text-emerald-400 shadow-sm shadow-emerald-500/10"
-                                : "bg-secondary/40 border-2 border-border/30 text-muted-foreground/20 hover:border-primary/30"
-                            }`}
-                          >
-                            {absent ? (
-                              <span className="text-zinc-400/60 text-xs font-bold">\u2014</span>
-                            ) : checked ? (
-                              <Check className="w-5 h-5" strokeWidth={3} />
-                            ) : null}
-                          </button>
-                        </td>
-                      );
-                    })}
-                    <td className="text-center py-1.5">
-                      <span className={`text-sm font-extrabold ${total >= 4 ? "text-emerald-600 dark:text-emerald-400" : total >= 3 ? "text-foreground" : "text-muted-foreground/60"}`}>
-                        {total}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {/* Daily points row */}
-              <tr className="border-t border-border/30">
-                <td className="py-1.5 pr-2">
-                  <span className="text-[9px] font-extrabold text-muted-foreground/60 uppercase tracking-widest">Pts</span>
-                </td>
-                {dailyPoints.map((dp, i) => (
-                  <td key={i} className="text-center py-1.5">
-                    <span className={`text-xs font-extrabold ${
-                      dp === -1 ? "text-zinc-400/50"
-                      : dp === 3 ? "text-emerald-600 dark:text-emerald-400"
-                      : dp === 0 ? "text-muted-foreground/30"
-                      : "text-foreground"
-                    }`}>
-                      {dp === -1 ? "\u2014" : `${dp}/3`}
-                    </span>
-                  </td>
-                ))}
-                <td />
-              </tr>
-            </tbody>
-          </table>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest">Days</span>
+            <span className="text-[10px] text-muted-foreground/70">
+              {isAiFilled("dailyGrid")
+                ? "AI filled — tap to adjust"
+                : "Default: all 3 tasks done. Tap a day to mark exceptions."}
+            </span>
+          </div>
+          <div className="grid grid-cols-5 gap-1.5 items-start">
+            {DAYS.map((day, i) => (
+              <DayChip
+                key={day}
+                label={day}
+                sabaq={dailySabaq[i]}
+                rmv={dailyRmv[i]}
+                review={dailyReview[i]}
+                absent={dailyAbsent[i]}
+                expanded={expandedDay === i}
+                onToggleExpand={() => setExpandedDay((p) => (p === i ? null : i))}
+                onChange={(patch) => {
+                  if (patch.sabaq !== undefined) toggle(dailySabaq, i, setDailySabaq);
+                  if (patch.rmv !== undefined) toggle(dailyRmv, i, setDailyRmv);
+                  if (patch.review !== undefined) toggle(dailyReview, i, setDailyReview);
+                  if (patch.absent !== undefined) toggleAbsent(i);
+                }}
+              />
+            ))}
+          </div>
         </div>
 
         {/* ── Points display ── */}
@@ -1252,6 +1288,19 @@ export default function LogWeek() {
               />
             )}
           </div>
+
+          {/* Same as last week — promoted to primary side-action. Most weeks
+              resemble the prior one; one tap pre-fills everything and the
+              teacher only edits deltas. */}
+          {lastEntry && !existingEntry && !submitted && (
+            <button
+              type="button"
+              onClick={handleCopyLastWeek}
+              className="px-4 py-3 rounded-2xl font-bold text-sm transition-all shadow-sm flex items-center gap-2 active:scale-[0.98] shrink-0 bg-primary/10 text-primary hover:bg-primary/15 border border-primary/20"
+            >
+              <Copy className="w-4 h-4" /> Same as last week
+            </button>
+          )}
 
           {/* Save */}
           <button type="button" onClick={handleSubmit} disabled={upsert.isPending || submitted}
