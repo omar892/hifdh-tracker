@@ -39,9 +39,19 @@ interface VersesByPageResponse {
 interface MushafPageProps {
   mushafId: string;        // 'madani_15' | 'indopak_15'
   pageNumber: number;      // 1–604 (madani) / 1–610 (indopak_15)
-  highlightLine?: number;  // 1–15
-  /** When provided, lines become hoverable + tappable; click fires this with the line number. */
-  onSelectLine?: (lineNumber: number) => void;
+  /**
+   * Teacher-facing line index (1..N where N = number of rendered text lines
+   * on the page). NOT the QF physical line_number — which can leave gaps for
+   * surah headers and basmala decoration. This component handles the mapping.
+   * Examples:
+   *   - Page 1 (Al-Fatihah): teacher line 1 = basmala line (QF line_number 9)
+   *   - Page 102 (mid-page, no header): teacher line 1 = QF line 1
+   */
+  highlightLine?: number;
+  /** Optional range highlight — [startLine, endLine] inclusive, teacher-facing. */
+  highlightRange?: [number, number];
+  /** When provided, lines become hoverable + tappable; click fires this with the teacher line index. */
+  onSelectLine?: (teacherLineIndex: number) => void;
   className?: string;
   fontSize?: "sm" | "md" | "lg";
 }
@@ -82,6 +92,7 @@ export function MushafPage({
   mushafId,
   pageNumber,
   highlightLine,
+  highlightRange,
   onSelectLine,
   className,
   fontSize = "md",
@@ -163,14 +174,29 @@ export function MushafPage({
       )}
       style={{ fontFamily, fontFeatureSettings: '"liga"' }}
     >
-      {[...linesByNumber.entries()].map(([lineNum, words]) => {
-        const isHighlight = highlightLine === lineNum;
+      {/*
+        Render with teacher-facing line indices. The teacher's "line N" maps
+        to the N-th rendered text line on the page, NOT the QF physical
+        line_number. On pages with a surah header (e.g. Al-Fatihah), QF's
+        line_number starts at 9 because lines 1-8 are decorative; the teacher
+        still calls the basmala "line 1".
+      */}
+      {[...linesByNumber.entries()].map(([qfLineNum, words], idx) => {
+        const teacherIdx = idx + 1;
+        const isHighlight = highlightLine === teacherIdx;
+        const inRange = highlightRange
+          ? teacherIdx >= highlightRange[0] && teacherIdx <= highlightRange[1]
+          : false;
         const selectable = !!onSelectLine;
         // aria text — pull text_uthmani so screen readers get something meaningful
         const aria = words.map((w) => w.text_uthmani ?? "").join(" ");
         const lineClass = cn(
           "mushaf-line transition-colors",
+          // Range fill (subtle background covering everything between anchor and endpoint)
+          inRange && !isHighlight && "rounded-md bg-emerald-50/70 dark:bg-emerald-950/20",
+          // Endpoint (bright ring)
           isHighlight && "rounded-md bg-emerald-50 ring-2 ring-emerald-400 ring-offset-1 dark:bg-emerald-950/30",
+          // Hover (only when selectable and not already highlighted)
           selectable && !isHighlight && "rounded-md cursor-pointer hover:bg-emerald-50/60 hover:ring-1 hover:ring-emerald-300 dark:hover:bg-emerald-950/20",
           selectable && "px-2",
         );
@@ -184,10 +210,10 @@ export function MushafPage({
         if (selectable) {
           return (
             <button
-              key={lineNum}
+              key={qfLineNum}
               type="button"
-              aria-label={`${aria} (tap to set as last line)`}
-              onClick={() => onSelectLine!(lineNum)}
+              aria-label={`${aria} (tap to set as line ${teacherIdx})`}
+              onClick={() => onSelectLine!(teacherIdx)}
               className={cn(lineClass, "block w-full text-center")}
               style={{ fontFamily, fontFeatureSettings: '"liga"' }}
             >
@@ -196,7 +222,7 @@ export function MushafPage({
           );
         }
         return (
-          <div key={lineNum} aria-label={aria} className={lineClass}>
+          <div key={qfLineNum} aria-label={aria} className={lineClass}>
             {lineContent}
           </div>
         );
