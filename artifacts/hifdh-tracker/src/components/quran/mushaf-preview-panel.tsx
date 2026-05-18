@@ -102,24 +102,50 @@ export function MushafPreviewPanel({
       </div>
       {open && (
         <div className="border-t border-border/50 p-3">
-          <MushafPage
-            mushafId={mushafId}
-            pageNumber={page}
-            highlightLine={line}
-            // If the anchor is on the same page being displayed AND we have a
-            // separate endpoint line, paint the range between them.
-            highlightRange={
-              anchorPage === page && anchorLine !== undefined && line !== undefined && anchorLine !== line
-                ? [Math.min(anchorLine, line), Math.max(anchorLine, line)]
-                : undefined
-            }
-            // Show the anchor marker only when its page matches the view AND
-            // it isn't the same line as the endpoint (which already has the
-            // bright ring treatment).
-            anchorLine={anchorPage === page && anchorLine !== line ? anchorLine : undefined}
-            onSelectLine={onSelectLine}
-            fontSize="md"
-          />
+          {/* When the week's range crosses a page boundary, render BOTH
+              pages side-by-side. The anchor page is contextual (shows the
+              start + tail of the prior page); the endpoint page is the
+              tappable surface. Same-page case shows just one page. */}
+          {anchorPage !== undefined && anchorPage !== page && anchorPage < page ? (
+            // Stack vertically on iPad portrait (≤1024px wide); side-by-side
+            // on landscape / desktop where each column has enough width to
+            // read the Arabic comfortably.
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {/* Anchor page — read-only, range from anchorLine to the rest of the page */}
+              <MushafPage
+                mushafId={mushafId}
+                pageNumber={anchorPage}
+                anchorLine={anchorLine}
+                highlightRange={anchorLine !== undefined ? [anchorLine, 15] : undefined}
+                fontSize="sm"
+              />
+              {/* Endpoint page — tappable, range from line 1 to endpoint */}
+              <MushafPage
+                mushafId={mushafId}
+                pageNumber={page}
+                highlightLine={line}
+                highlightRange={line !== undefined ? [1, line] : undefined}
+                onSelectLine={onSelectLine}
+                fontSize="sm"
+              />
+            </div>
+          ) : (
+            <MushafPage
+              mushafId={mushafId}
+              pageNumber={page}
+              highlightLine={line}
+              // Same-page anchor → endpoint: paint the range between them.
+              highlightRange={
+                anchorPage === page && anchorLine !== undefined && line !== undefined && anchorLine !== line
+                  ? [Math.min(anchorLine, line), Math.max(anchorLine, line)]
+                  : undefined
+              }
+              // Anchor marker only when its page matches AND distinct from endpoint.
+              anchorLine={anchorPage === page && anchorLine !== line ? anchorLine : undefined}
+              onSelectLine={onSelectLine}
+              fontSize="md"
+            />
+          )}
         </div>
       )}
     </div>
