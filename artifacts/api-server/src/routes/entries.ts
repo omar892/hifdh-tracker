@@ -12,6 +12,7 @@ import { requireAuth } from "../middlewares/auth";
 import { getJuzForPage } from "../lib/quran-data";
 import { enrichLogEntry } from "../lib/quran/lookup";
 import { getCompletedJuz } from "./students";
+import { getStudentForTeacher } from "../lib/scope";
 
 const router: IRouter = Router();
 
@@ -51,8 +52,15 @@ function serializeEntry(entry: typeof weeklyEntriesTable.$inferSelect) {
 }
 
 router.get("/students/:studentId/entries/weekly", requireAuth, async (req, res) => {
+  const teacher = req.teacher!;
   const { studentId } = ListWeeklyEntriesParams.parse(req.params);
   const query = ListWeeklyEntriesQueryParams.parse(req.query);
+
+  const student = await getStudentForTeacher(studentId, teacher.id);
+  if (!student) {
+    res.status(404).json({ error: "Student not found" });
+    return;
+  }
 
   let entries = await db
     .select()
@@ -70,7 +78,15 @@ router.get("/students/:studentId/entries/weekly", requireAuth, async (req, res) 
 });
 
 router.get("/students/:studentId/entries/weekly/:weekStart", requireAuth, async (req, res) => {
+  const teacher = req.teacher!;
   const { studentId, weekStart } = GetWeeklyEntryParams.parse(req.params);
+
+  const student = await getStudentForTeacher(studentId, teacher.id);
+  if (!student) {
+    res.status(404).json({ error: "Student not found" });
+    return;
+  }
+
   const [entry] = await db
     .select()
     .from(weeklyEntriesTable)
@@ -90,8 +106,15 @@ router.get("/students/:studentId/entries/weekly/:weekStart", requireAuth, async 
 
 router.put("/students/:studentId/entries/weekly/:weekStart", requireAuth, async (req, res, next) => {
   try {
+  const teacher = req.teacher!;
   const { studentId, weekStart } = UpsertWeeklyEntryParams.parse(req.params);
   const body = UpsertWeeklyEntryBody.parse(req.body);
+
+  const student = await getStudentForTeacher(studentId, teacher.id);
+  if (!student) {
+    res.status(404).json({ error: "Student not found" });
+    return;
+  }
 
   const mondayDate = getMondayOfWeek(weekStart);
   const fridayDate = getFridayOfWeek(mondayDate);
@@ -120,6 +143,7 @@ router.put("/students/:studentId/entries/weekly/:weekStart", requireAuth, async 
 
   const entryData = {
     studentId,
+    teacherId: teacher.id,
     weekStartDate: mondayDate,
     weekEndDate: fridayDate,
     memorizationLines,
@@ -186,7 +210,7 @@ router.put("/students/:studentId/entries/weekly/:weekStart", requireAuth, async 
 
       if (newJuz.length > 0) {
         await db.insert(studentCompletedJuzTable).values(
-          newJuz.map((juz) => ({ studentId, juzNumber: juz, autoCompleted: true }))
+          newJuz.map((juz) => ({ studentId, teacherId: teacher.id, juzNumber: juz, autoCompleted: true }))
         );
       }
     }
@@ -195,11 +219,6 @@ router.put("/students/:studentId/entries/weekly/:weekStart", requireAuth, async 
   // Enrich the response with this week's verse coverage from the Quran
   // Foundation cache. Look up the student's mushaf preference + the previous
   // entry's end position to derive the page range covered.
-  const [student] = await db
-    .select()
-    .from(studentsTable)
-    .where(eq(studentsTable.id, studentId));
-
   const [prevEntry] = await db
     .select()
     .from(weeklyEntriesTable)
@@ -215,7 +234,7 @@ router.put("/students/:studentId/entries/weekly/:weekStart", requireAuth, async 
   let coverage = null;
   try {
     coverage = await enrichLogEntry({
-      mushafId: student?.mushafPreference ?? "madani_15",
+      mushafId: student.mushafPreference ?? "madani_15",
       prevPage: prevEntry?.currentPage ?? null,
       prevLine: prevEntry?.currentLine ?? null,
       currentPage: entry.currentPage ?? null,

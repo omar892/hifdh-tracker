@@ -16,7 +16,20 @@
  *   SEED_CONFIRM=yes pnpm --filter @workspace/scripts run seed-demo
  */
 
-import { db, pool, studentsTable, weeklyEntriesTable, mushafsTable, studentCompletedJuzTable } from "@workspace/db";
+import {
+  db,
+  pool,
+  studentsTable,
+  weeklyEntriesTable,
+  mushafsTable,
+  studentCompletedJuzTable,
+  programsTable,
+  usersTable,
+  classesTable,
+  guardiansTable,
+  viewerAccessTable,
+} from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 /**
  * Madani 15-line page numbers where each juz starts. Mirrors
@@ -333,12 +346,20 @@ async function main() {
   const currentMonday = mondayOf(today);
 
   console.log(`[seed-demo] Anchoring at today=${isoDate(today)}, currentMonday=${isoDate(currentMonday)}`);
-  console.log(`[seed-demo] Wiping student_completed_juz + weekly_entries + students…`);
-  // Order matters: both child tables FK to students with no ON DELETE CASCADE,
-  // so they have to go first.
+  console.log(`[seed-demo] Wiping in FK order…`);
+  // FK order: leaves first, then trunks.
+  //   viewer_access, guardians, student_completed_juz, weekly_entries → students
+  //   students → classes, users, programs
+  //   classes → users, programs
+  //   users → programs
+  await db.delete(viewerAccessTable);
+  await db.delete(guardiansTable);
   await db.delete(studentCompletedJuzTable);
   await db.delete(weeklyEntriesTable);
   await db.delete(studentsTable);
+  await db.delete(classesTable);
+  await db.delete(usersTable);
+  await db.delete(programsTable);
 
   // Ensure the mushaf catalog rows exist before students reference them. The
   // quranApiId values match QF's mushaf IDs (1 = Hafs Uthmani v2 / Madani, 16
@@ -353,13 +374,48 @@ async function main() {
     ])
     .onConflictDoNothing();
 
+  // Bootstrap the multi-teacher skeleton: one program, one admin user, one
+  // class. All seeded students get stamped with these IDs. The program
+  // owner_id is wired after the user exists.
+  console.log(`[seed-demo] Bootstrapping program + admin user + default class…`);
+  const [program] = await db
+    .insert(programsTable)
+    .values({ name: "Hifdh Program" })
+    .returning();
+  const [user] = await db
+    .insert(usersTable)
+    .values({
+      programId: program.id,
+      email: "teacher@hifdh.local",
+      name: "Teacher",
+      role: "admin",
+      // passwordHash empty in step 1 — login goes through TEACHER_PASSWORD env.
+      // Real bcrypt hash lands in step 7 with the email+password UI.
+      passwordHash: "",
+    })
+    .returning();
+  await db
+    .update(programsTable)
+    .set({ ownerId: user.id })
+    .where(eq(programsTable.id, program.id));
+  const [klass] = await db
+    .insert(classesTable)
+    .values({ programId: program.id, teacherId: user.id, name: "Main Class" })
+    .returning();
+  console.log(`  + program=${program.id} user=${user.id} class=${klass.id}`);
+
   for (const profile of PROFILES) {
     const rand = seededRandom(profile.name);
 
     // Insert the student first; we'll update currentPage/Line at the end.
+    // Stamp with the bootstrapped program/class/teacher so every query that
+    // scopes by teacher_id finds these students.
     const [student] = await db
       .insert(studentsTable)
       .values({
+        programId: program.id,
+        classId: klass.id,
+        teacherId: user.id,
         name: profile.name,
         gender: profile.gender,
         startDate: profile.startDate,
@@ -438,6 +494,7 @@ async function main() {
 
       await db.insert(weeklyEntriesTable).values({
         studentId: student.id,
+        teacherId: user.id,
         weekStartDate: isoDate(weekStart),
         weekEndDate: isoDate(weekEnd),
         memorizationLines: Math.max(0, memorizationLines),
@@ -492,6 +549,7 @@ async function main() {
         const completedAt = new Date(startMs + fraction * span + jitter);
         juzRows.push({
           studentId: student.id,
+          teacherId: user.id,
           juzNumber: j,
           autoCompleted: true,
           createdAt: completedAt,
@@ -509,7 +567,6 @@ async function main() {
   await pool.end();
 }
 
-import { eq } from "drizzle-orm";
 function eqStudentId(id: number) {
   return eq(studentsTable.id, id);
 }

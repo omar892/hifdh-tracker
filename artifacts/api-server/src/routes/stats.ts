@@ -1,10 +1,11 @@
 import { Router, type IRouter } from "express";
 import { db, weeklyEntriesTable, studentsTable, studentCompletedJuzTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, inArray } from "drizzle-orm";
 import { GetStudentStatsParams, GetStudentCalendarParams, GetStudentProjectionsParams } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import { SURAHS, TOTAL_LINES, getLinesForCompletedJuz } from "../lib/quran-data";
 import { getCompletedJuz } from "./students";
+import { getStudentForTeacher } from "../lib/scope";
 
 const router: IRouter = Router();
 
@@ -117,9 +118,10 @@ function getWeeksInMonth(yearMonth: string): Array<{ weekStartDate: string; week
 }
 
 router.get("/students/:studentId/stats", requireAuth, async (req, res) => {
+  const teacher = req.teacher!;
   const { studentId } = GetStudentStatsParams.parse(req.params);
 
-  const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, studentId));
+  const student = await getStudentForTeacher(studentId, teacher.id);
   if (!student) {
     res.status(404).json({ error: "Student not found" });
     return;
@@ -195,11 +197,18 @@ router.get("/students/:studentId/stats", requireAuth, async (req, res) => {
 });
 
 router.get("/students/:studentId/calendar", requireAuth, async (req, res) => {
+  const teacher = req.teacher!;
   const { studentId } = GetStudentCalendarParams.parse(req.params);
   const month = req.query.month as string;
 
   if (!month || !/^\d{4}-\d{2}$/.test(month)) {
     res.status(400).json({ error: "month query param required (YYYY-MM)" });
+    return;
+  }
+
+  const student = await getStudentForTeacher(studentId, teacher.id);
+  if (!student) {
+    res.status(404).json({ error: "Student not found" });
     return;
   }
 
@@ -247,10 +256,11 @@ router.get("/students/:studentId/calendar", requireAuth, async (req, res) => {
 });
 
 router.get("/dashboard", requireAuth, async (req, res) => {
+  const teacher = req.teacher!;
   const students = await db
     .select()
     .from(studentsTable)
-    .where(eq(studentsTable.active, true));
+    .where(and(eq(studentsTable.teacherId, teacher.id), eq(studentsTable.active, true)));
 
   const thisWeekMonday = getCurrentMonday();
 
@@ -537,8 +547,17 @@ function computeSpotlights(
 /* ── /stats/class route ──────────────────────────── */
 
 router.get("/stats/class", requireAuth, async (req, res) => {
-  const students = await db.select().from(studentsTable).where(eq(studentsTable.active, true));
-  const allWeeklyEntries = await db.select().from(weeklyEntriesTable);
+  const teacher = req.teacher!;
+  const students = await db
+    .select()
+    .from(studentsTable)
+    .where(and(eq(studentsTable.teacherId, teacher.id), eq(studentsTable.active, true)));
+  // Scope entries to only this teacher's students. Avoids leaking another
+  // teacher's data through aggregates (mean lines/week, success rate, etc.).
+  const studentIds = students.map((s) => s.id);
+  const allWeeklyEntries = studentIds.length > 0
+    ? await db.select().from(weeklyEntriesTable).where(inArray(weeklyEntriesTable.studentId, studentIds))
+    : [];
 
   const entryMap = new Map<number, typeof allWeeklyEntries>();
   for (const entry of allWeeklyEntries) {
@@ -907,9 +926,10 @@ router.get("/stats/class", requireAuth, async (req, res) => {
 const HALF_QURAN_LINES = Math.round(TOTAL_LINES / 2); // 4530
 
 router.get("/students/:studentId/projections", requireAuth, async (req, res) => {
+  const teacher = req.teacher!;
   const { studentId } = GetStudentProjectionsParams.parse(req.params);
 
-  const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, studentId));
+  const student = await getStudentForTeacher(studentId, teacher.id);
   if (!student) {
     res.status(404).json({ error: "Student not found" });
     return;

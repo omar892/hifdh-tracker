@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, studentsTable, studentCompletedJuzTable } from "@workspace/db";
+import { db, studentsTable, studentCompletedJuzTable, classesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import {
   ListStudentsQueryParams,
@@ -33,11 +33,11 @@ async function getCompletedJuz(studentId: number): Promise<number[]> {
   return rows.map((r) => r.juzNumber).sort((a, b) => a - b);
 }
 
-async function setCompletedJuz(studentId: number, juzNumbers: number[], autoCompleted = false): Promise<void> {
+async function setCompletedJuz(studentId: number, teacherId: number, juzNumbers: number[], autoCompleted = false): Promise<void> {
   await db.delete(studentCompletedJuzTable).where(eq(studentCompletedJuzTable.studentId, studentId));
   if (juzNumbers.length > 0) {
     await db.insert(studentCompletedJuzTable).values(
-      juzNumbers.map((juz) => ({ studentId, juzNumber: juz, autoCompleted }))
+      juzNumbers.map((juz) => ({ studentId, teacherId, juzNumber: juz, autoCompleted }))
     );
   }
 }
@@ -47,21 +47,49 @@ async function studentWithJuz(student: typeof studentsTable.$inferSelect) {
   return { ...student, completedJuz };
 }
 
+/**
+ * Look up the (single) default class for a teacher. Today every teacher has
+ * exactly one class — created at backfill — so this returns it. When teachers
+ * can have multiple classes (post step 7), callers will pass classId explicitly.
+ */
+async function getDefaultClassForTeacher(teacherId: number) {
+  const [klass] = await db
+    .select()
+    .from(classesTable)
+    .where(eq(classesTable.teacherId, teacherId))
+    .limit(1);
+  return klass ?? null;
+}
+
 router.get("/students", requireAuth, async (req, res) => {
+  const teacher = req.teacher!;
   const query = ListStudentsQueryParams.parse(req.query);
-  let students;
+  // Always scope by teacher_id so this becomes a multi-teacher-safe read
+  // for free when the UI eventually has more than one teacher.
+  const conditions = [eq(studentsTable.teacherId, teacher.id)];
   if (query.active !== undefined) {
-    students = await db.select().from(studentsTable).where(eq(studentsTable.active, query.active));
-  } else {
-    students = await db.select().from(studentsTable);
+    conditions.push(eq(studentsTable.active, query.active));
   }
+  const students = await db
+    .select()
+    .from(studentsTable)
+    .where(and(...conditions));
   const result = await Promise.all(students.map(studentWithJuz));
   res.json(result);
 });
 
 router.post("/students", requireAuth, async (req, res) => {
+  const teacher = req.teacher!;
   const body = CreateStudentBodyCoerced.parse(req.body);
+  const klass = await getDefaultClassForTeacher(teacher.id);
+  if (!klass) {
+    res.status(500).json({ error: "Teacher has no default class. Run seed-demo to bootstrap." });
+    return;
+  }
   const [student] = await db.insert(studentsTable).values({
+    programId: teacher.programId,
+    classId: klass.id,
+    teacherId: teacher.id,
     name: body.name,
     gender: body.gender ?? null,
     currentPage: body.currentPage,
@@ -74,15 +102,19 @@ router.post("/students", requireAuth, async (req, res) => {
   }).returning();
 
   if (body.completedJuz.length > 0) {
-    await setCompletedJuz(student.id, body.completedJuz);
+    await setCompletedJuz(student.id, teacher.id, body.completedJuz);
   }
 
   res.status(201).json(await studentWithJuz(student));
 });
 
 router.get("/students/:id", requireAuth, async (req, res) => {
+  const teacher = req.teacher!;
   const { id } = GetStudentParams.parse(req.params);
-  const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, id));
+  const [student] = await db
+    .select()
+    .from(studentsTable)
+    .where(and(eq(studentsTable.id, id), eq(studentsTable.teacherId, teacher.id)));
   if (!student) {
     res.status(404).json({ error: "Student not found" });
     return;
@@ -91,6 +123,7 @@ router.get("/students/:id", requireAuth, async (req, res) => {
 });
 
 router.patch("/students/:id", requireAuth, async (req, res) => {
+  const teacher = req.teacher!;
   const { id } = UpdateStudentParams.parse(req.params);
   const body = UpdateStudentBody.parse(req.body);
   const updateData: Partial<{
@@ -117,10 +150,18 @@ router.patch("/students/:id", requireAuth, async (req, res) => {
   const hasUpdate = Object.keys(updateData).length > 0;
   let student;
 
+  // Always require the student belongs to the current teacher.
   if (hasUpdate) {
-    [student] = await db.update(studentsTable).set(updateData).where(eq(studentsTable.id, id)).returning();
+    [student] = await db
+      .update(studentsTable)
+      .set(updateData)
+      .where(and(eq(studentsTable.id, id), eq(studentsTable.teacherId, teacher.id)))
+      .returning();
   } else {
-    [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, id));
+    [student] = await db
+      .select()
+      .from(studentsTable)
+      .where(and(eq(studentsTable.id, id), eq(studentsTable.teacherId, teacher.id)));
   }
 
   if (!student) {
@@ -129,7 +170,7 @@ router.patch("/students/:id", requireAuth, async (req, res) => {
   }
 
   if (body.completedJuz !== undefined) {
-    await setCompletedJuz(student.id, body.completedJuz);
+    await setCompletedJuz(student.id, teacher.id, body.completedJuz);
   }
 
   res.json(await studentWithJuz(student));

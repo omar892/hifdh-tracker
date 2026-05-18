@@ -2,10 +2,14 @@ import { pgTable, serial, integer, text, timestamp, date } from "drizzle-orm/pg-
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { studentsTable } from "./students";
+import { usersTable } from "./users";
 
 export const weeklyEntriesTable = pgTable("weekly_entries", {
   id: serial("id").primaryKey(),
   studentId: integer("student_id").notNull().references(() => studentsTable.id),
+  // Which teacher logged this entry. Nullable in schema so the migration can
+  // land the column, then backfill, then add NOT NULL.
+  teacherId: integer("teacher_id").references(() => usersTable.id),
   weekStartDate: date("week_start_date").notNull(),
   weekEndDate: date("week_end_date").notNull(),
 
