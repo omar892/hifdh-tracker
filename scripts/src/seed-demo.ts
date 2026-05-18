@@ -16,7 +16,45 @@
  *   SEED_CONFIRM=yes pnpm --filter @workspace/scripts run seed-demo
  */
 
-import { db, pool, studentsTable, weeklyEntriesTable, mushafsTable } from "@workspace/db";
+import { db, pool, studentsTable, weeklyEntriesTable, mushafsTable, studentCompletedJuzTable } from "@workspace/db";
+
+/**
+ * Madani 15-line page numbers where each juz starts. Mirrors
+ * artifacts/api-server/src/lib/quran-data.ts:JUZ_START_PAGES — kept inline so
+ * this script has no api-server dependency. Juz 30 ends at page 604.
+ */
+const JUZ_START_PAGES = [
+  1, 22, 42, 62, 82, 102, 121, 142, 162, 182,
+  201, 222, 242, 262, 282, 302, 322, 342, 362, 382,
+  402, 422, 442, 462, 482, 502, 522, 542, 562, 582,
+];
+
+function juzForPage(page: number): number {
+  for (let i = JUZ_START_PAGES.length - 1; i >= 0; i--) {
+    if (page >= JUZ_START_PAGES[i]) return i + 1;
+  }
+  return 1;
+}
+
+/**
+ * Realistic teacher notes to sprinkle on ~20% of entries. Tone matches a
+ * teacher tracking 10 students closely — short, specific, sometimes about
+ * absence, sometimes about technique.
+ */
+const TEACHER_NOTES = [
+  "Strong tajweed throughout the week",
+  "Need to revise Surah Al-Baqarah RMV",
+  "Excellent retention on new material",
+  "Struggling with new pages — recommended slower pace next week",
+  "Completed surah mid-week, very motivated",
+  "Doctor appointment Wed afternoon — reduced schedule",
+  "Family event Thursday, came in tired Friday",
+  "RMV scores improving — keep momentum",
+  "Asked for extra review session next week",
+  "Beautiful recitation in morning halaqa",
+  "Needs daily 1:1 reinforcement on new juz",
+  "Confident with last week's new material",
+];
 
 type Rating =
   | "excellent"
@@ -366,6 +404,14 @@ async function main() {
 
       const rating = pickRating(rand, profile.ratingDist);
 
+      // ~20% of entries get a teacher note for richness on the profile view.
+      const note = rand() < 0.2 ? TEACHER_NOTES[Math.floor(rand() * TEACHER_NOTES.length)] : null;
+      // ~50% of entries get RMV + Review scores (1-3 scale matching the UI),
+      // skewed toward 2-3 for strong profiles, 1-2 for struggling ones.
+      const scoreBase = profile.ratingDist[0] + profile.ratingDist[1] > 0.5 ? 2 : 1;
+      const rmvScore = rand() < 0.5 ? scoreBase + Math.floor(rand() * 2) : null;
+      const reviewScore = rand() < 0.5 ? scoreBase + Math.floor(rand() * 2) : null;
+
       await db.insert(weeklyEntriesTable).values({
         studentId: student.id,
         weekStartDate: isoDate(weekStart),
@@ -382,8 +428,10 @@ async function main() {
         weeklyPoints,
         rmvAmount: profile.defaultRmv ?? null,
         reviewAmount: profile.defaultReview ?? null,
+        rmvScore,
+        reviewScore,
         weekRating: rating,
-        teacherNotes: null,
+        teacherNotes: note,
       });
 
       lastEntryPage = advanced.page;
@@ -398,6 +446,35 @@ async function main() {
       .update(studentsTable)
       .set({ currentPage: lastEntryPage, currentLine: lastEntryLine })
       .where(eqStudentId(student.id));
+
+    // Populate student_completed_juz with rows for every juz fully below
+    // their final position. Dates are spread between the student's startDate
+    // and ~3 weeks ago so timeline-aware views (recent completions, juz this
+    // month) have something to show. Skipped/paused students get their last
+    // completion before the pause point.
+    const finalJuz = juzForPage(lastEntryPage); // juz they're CURRENTLY on
+    const completedCount = finalJuz - 1; // juz fully behind them are "completed"
+    if (completedCount > 0) {
+      const startMs = new Date(profile.startDate + "T00:00:00Z").getTime();
+      const pauseWeeks = profile.skipRecentWeeks ?? 0;
+      const endRef = addDays(currentMonday, -7 * (pauseWeeks + 2)); // ~2 weeks before today/pause
+      const endMs = endRef.getTime();
+      const span = Math.max(endMs - startMs, 14 * 24 * 60 * 60 * 1000); // at least 2-week span
+      const juzRows = [];
+      for (let j = 1; j <= completedCount; j++) {
+        // Even spacing with mild jitter so timestamps don't look mechanical.
+        const fraction = (j - 0.5) / completedCount;
+        const jitter = (rand() - 0.5) * (span / completedCount) * 0.4;
+        const completedAt = new Date(startMs + fraction * span + jitter);
+        juzRows.push({
+          studentId: student.id,
+          juzNumber: j,
+          autoCompleted: true,
+          createdAt: completedAt,
+        });
+      }
+      await db.insert(studentCompletedJuzTable).values(juzRows);
+    }
   }
 
   // Don't log the current week as logged for everyone — leave 2-3 students
