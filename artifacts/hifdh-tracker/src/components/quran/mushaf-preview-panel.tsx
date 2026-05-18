@@ -15,6 +15,12 @@ interface MushafPreviewPanelProps {
   mushafId: "madani_15" | "indopak_15";
   page: number;
   line?: number;
+  /**
+   * Anchor (start) position — last week's endpoint. Shown as a faint marker
+   * on the page when anchorPage matches the displayed page.
+   */
+  anchorPage?: number;
+  anchorLine?: number;
   /** When provided, tapping a line fires this callback (with the line number). */
   onSelectLine?: (lineNumber: number) => void;
   /** When provided, prev/next buttons appear and call this with the new page. */
@@ -29,6 +35,8 @@ export function MushafPreviewPanel({
   mushafId,
   page,
   line,
+  anchorPage,
+  anchorLine,
   onSelectLine,
   onPageChange,
   maxPage,
@@ -98,6 +106,17 @@ export function MushafPreviewPanel({
             mushafId={mushafId}
             pageNumber={page}
             highlightLine={line}
+            // If the anchor is on the same page being displayed AND we have a
+            // separate endpoint line, paint the range between them.
+            highlightRange={
+              anchorPage === page && anchorLine !== undefined && line !== undefined && anchorLine !== line
+                ? [Math.min(anchorLine, line), Math.max(anchorLine, line)]
+                : undefined
+            }
+            // Show the anchor marker only when its page matches the view AND
+            // it isn't the same line as the endpoint (which already has the
+            // bright ring treatment).
+            anchorLine={anchorPage === page && anchorLine !== line ? anchorLine : undefined}
             onSelectLine={onSelectLine}
             fontSize="md"
           />

@@ -50,6 +50,12 @@ interface MushafPageProps {
   highlightLine?: number;
   /** Optional range highlight — [startLine, endLine] inclusive, teacher-facing. */
   highlightRange?: [number, number];
+  /**
+   * Optional faint marker on a line — used to show last week's anchor
+   * position so the teacher sees where the week started before tapping the
+   * endpoint. Distinct from highlightLine (the bright endpoint).
+   */
+  anchorLine?: number;
   /** When provided, lines become hoverable + tappable; click fires this with the teacher line index. */
   onSelectLine?: (teacherLineIndex: number) => void;
   className?: string;
@@ -93,6 +99,7 @@ export function MushafPage({
   pageNumber,
   highlightLine,
   highlightRange,
+  anchorLine,
   onSelectLine,
   className,
   fontSize = "md",
@@ -187,13 +194,16 @@ export function MushafPage({
         const inRange = highlightRange
           ? teacherIdx >= highlightRange[0] && teacherIdx <= highlightRange[1]
           : false;
+        const isAnchor = anchorLine === teacherIdx;
         const selectable = !!onSelectLine;
         // aria text — pull text_uthmani so screen readers get something meaningful
         const aria = words.map((w) => w.text_uthmani ?? "").join(" ");
         const lineClass = cn(
-          "mushaf-line transition-colors",
+          "mushaf-line transition-colors relative",
           // Range fill (subtle background covering everything between anchor and endpoint)
           inRange && !isHighlight && "rounded-md bg-emerald-50/70 dark:bg-emerald-950/20",
+          // Anchor — faint dashed left border indicator on the starting line
+          isAnchor && !isHighlight && "border-l-2 border-dashed border-emerald-400/60",
           // Endpoint (bright ring)
           isHighlight && "rounded-md bg-emerald-50 ring-2 ring-emerald-400 ring-offset-1 dark:bg-emerald-950/30",
           // Hover (only when selectable and not already highlighted)

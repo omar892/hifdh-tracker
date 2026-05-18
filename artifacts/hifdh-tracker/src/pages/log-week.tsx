@@ -313,6 +313,10 @@ export default function LogWeek() {
   const [showNotes, setShowNotes] = useState(false);
   // Per-day expansion: only the day the teacher is editing is open.
   const [expandedDay, setExpandedDay] = useState<number | null>(null);
+  // Position is set by tap-to-set in the mushaf preview. The numeric
+  // page/line inputs are revealed only when the teacher hits "edit" — the
+  // rare-case manual override.
+  const [showPositionOverride, setShowPositionOverride] = useState(false);
 
   // AI entry state
   const [entryMode, setEntryMode] = useState<EntryMode>(() => {
@@ -743,12 +747,23 @@ export default function LogWeek() {
       toast({ title: "Missing student", variant: "destructive" });
       return;
     }
+    // Derive lines from the position diff vs. last week's anchor. The teacher
+    // sets position via tap-to-set on the mushaf; lines are computed, not
+    // typed. 15 lines per Madani page is the simple model used here.
+    const anchorPage = existingEntry
+      ? (student?.currentPage ?? 1)
+      : (lastEntry?.currentPage ?? student?.currentPage ?? 1);
+    const anchorLine = existingEntry
+      ? (student?.currentLine ?? 1)
+      : (lastEntry?.currentLine ?? student?.currentLine ?? 1);
+    const derivedLines = Math.max(0, (currentPage - anchorPage) * 15 + (currentLine - anchorLine));
+
     try {
       await upsert.mutateAsync({
         studentId: student.id,
         weekStart: weekStartStr,
         data: {
-          memorizationLines,
+          memorizationLines: derivedLines,
           currentPage,
           currentLine,
           dailySabaq,
@@ -1072,92 +1087,109 @@ export default function LogWeek() {
         {/* ── Manual Form ── */}
         {entryMode === "manual" && (<>
 
-        {/* ── New Lines + Current Position ── */}
-        <div className="grid grid-cols-2 gap-2.5 mb-3">
-          {/* Left: New Lines This Week */}
-          <div className={`bg-card rounded-2xl border border-border/50 p-3 shadow-sm ${aiBorderClass("memorizationLines")}`}>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <BookOpen className="w-3.5 h-3.5 text-primary" />
-              </div>
-              <span className="text-[10px] font-extrabold text-primary uppercase tracking-widest">New Lines This Week</span>
-              {isAiFilled("memorizationLines") && <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full ml-auto">AI</span>}
-            </div>
-            <input
-              type="number"
-              min={0}
-              value={memorizationLines}
-              onChange={(e) => setMemorizationLines(Math.max(0, parseInt(e.target.value) || 0))}
-              className="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-foreground text-2xl font-extrabold text-center focus:border-primary outline-none transition-all"
-            />
-            {memorizationLines > 0 && (
-              <p className="text-xs text-muted-foreground mt-1 text-center font-medium">
-                = {(memorizationLines / 15).toFixed(1)} pages
-              </p>
-            )}
-          </div>
+        {/* ── Position: mushaf preview is the primary input, summary below ── */}
+        {(() => {
+          // Anchor = last week's endpoint. For a NEW entry this is the most-recent
+          // weekly entry; for an EDIT of an existing entry it's the student's stored
+          // position (set from the entry before this one). Falls back to student
+          // initial position if no entries exist yet.
+          const anchorPage = existingEntry
+            ? (student?.currentPage ?? 1)
+            : (lastEntry?.currentPage ?? student?.currentPage ?? 1);
+          const anchorLine = existingEntry
+            ? (student?.currentLine ?? 1)
+            : (lastEntry?.currentLine ?? student?.currentLine ?? 1);
+          const linesDelta = (currentPage - anchorPage) * 15 + (currentLine - anchorLine);
+          const mushafPref = (student?.mushafPreference ?? "madani_15") as "madani_15" | "indopak_15";
 
-          {/* Right: Current Position */}
-          <div className={`bg-card rounded-2xl border border-border/50 p-3 shadow-sm ${aiBorderClass("currentPage")}`}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest">Current Position</span>
-              {(isAiFilled("currentPage") || isAiFilled("currentLine")) && <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full ml-auto">AI</span>}
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
-                <span className="text-[9px] font-bold text-muted-foreground/70 uppercase">Page</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={604}
-                  value={currentPage}
-                  onChange={(e) => setCurrentPage(Math.max(1, Math.min(604, parseInt(e.target.value) || 1)))}
-                  className="w-full px-2 py-1.5 rounded-lg bg-background border border-border text-foreground text-sm font-bold text-center focus:border-primary outline-none transition-all"
-                />
-              </div>
-              <div className="flex-1">
-                <span className="text-[9px] font-bold text-muted-foreground/70 uppercase">Line</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={15}
-                  value={currentLine}
-                  onChange={(e) => setCurrentLine(Math.max(1, Math.min(15, parseInt(e.target.value) || 1)))}
-                  className="w-full px-2 py-1.5 rounded-lg bg-background border border-border text-foreground text-sm font-bold text-center focus:border-primary outline-none transition-all"
-                />
-              </div>
-            </div>
-            {(() => {
-              const lastPage = existingEntry ? (student?.currentPage ?? 1) : (lastEntry?.currentPage ?? student?.currentPage ?? 1);
-              const lastLine = existingEntry ? (student?.currentLine ?? 1) : (lastEntry?.currentLine ?? student?.currentLine ?? 1);
-              const pageDelta = currentPage - lastPage;
-              const lineDelta = currentLine - lastLine;
-              return (
-                <>
-                  <p className="text-[10px] text-muted-foreground/60 mt-1.5 font-medium">
-                    Last week: Page {lastPage}, Line {lastLine}
+          return (
+            <>
+              <MushafPreviewPanel
+                mushafId={mushafPref}
+                page={currentPage}
+                line={currentLine}
+                anchorPage={anchorPage}
+                anchorLine={anchorLine}
+                onSelectLine={(ln) => setCurrentLine(ln)}
+                onPageChange={(p) => setCurrentPage(p)}
+                defaultOpen
+              />
+
+              {/* Computed summary — replaces the stepper + numeric position fields */}
+              <div className={`bg-card rounded-2xl border border-border/50 px-4 py-2.5 mb-3 shadow-sm flex items-center gap-3 ${aiBorderClass("memorizationLines")}`}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2">
+                    <span
+                      className={`text-lg font-extrabold tracking-tight ${
+                        linesDelta > 0
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : linesDelta < 0
+                          ? "text-amber-600 dark:text-amber-400"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {linesDelta > 0 ? "+" : ""}{linesDelta} {Math.abs(linesDelta) === 1 ? "line" : "lines"}
+                    </span>
+                    <span className="text-sm text-muted-foreground">·</span>
+                    <span className="text-sm font-bold text-foreground">
+                      now page {currentPage}, line {currentLine}
+                    </span>
+                    {(isAiFilled("memorizationLines") || isAiFilled("currentPage") || isAiFilled("currentLine")) && (
+                      <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">AI</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                    From page {anchorPage}, line {anchorLine} (last week)
                   </p>
-                  {(pageDelta !== 0 || lineDelta !== 0) && (
-                    <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                      {pageDelta > 0 ? `▲ ${pageDelta} pg` : pageDelta < 0 ? `▼ ${Math.abs(pageDelta)} pg` : ""}
-                      {pageDelta !== 0 && lineDelta !== 0 ? ", " : ""}
-                      {lineDelta > 0 ? `▲ ${lineDelta} ln` : lineDelta < 0 ? `▼ ${Math.abs(lineDelta)} ln` : ""}
-                    </p>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-        </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPositionOverride((v) => !v)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-secondary transition-all shrink-0"
+                  aria-label="Edit position manually"
+                  title="Manual override"
+                >
+                  <PenLine className="w-3.5 h-3.5" /> Edit
+                </button>
+              </div>
 
-        {/* ── Mushaf preview ── */}
-        <MushafPreviewPanel
-          mushafId={(student?.mushafPreference ?? "madani_15") as "madani_15" | "indopak_15"}
-          page={currentPage}
-          line={currentLine}
-          onSelectLine={(ln) => setCurrentLine(ln)}
-          onPageChange={(p) => setCurrentPage(p)}
-        />
+              {/* Manual override — page + line numeric inputs. Rare path. */}
+              {showPositionOverride && (
+                <div className="bg-muted/40 rounded-2xl border border-border/40 px-3 py-2.5 mb-3 flex items-end gap-3">
+                  <div className="flex-1">
+                    <label className="block text-[9px] font-bold text-muted-foreground/80 uppercase tracking-widest mb-1">Page</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={604}
+                      value={currentPage}
+                      onChange={(e) => setCurrentPage(Math.max(1, Math.min(604, parseInt(e.target.value) || 1)))}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm font-bold text-center focus:border-primary outline-none"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-[9px] font-bold text-muted-foreground/80 uppercase tracking-widest mb-1">Line</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={15}
+                      value={currentLine}
+                      onChange={(e) => setCurrentLine(Math.max(1, Math.min(15, parseInt(e.target.value) || 1)))}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm font-bold text-center focus:border-primary outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPositionOverride(false)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground transition-all"
+                  >
+                    Done
+                  </button>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* ── RMV & Review amounts ── */}
         <div className="grid grid-cols-2 gap-2.5 mb-3">
