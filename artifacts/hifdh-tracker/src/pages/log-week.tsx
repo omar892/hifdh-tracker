@@ -51,7 +51,84 @@ const WEEK_RATINGS = [
 const EMPTY_5 = (): boolean[] => [false, false, false, false, false];
 const FULL_5 = (): boolean[] => [true, true, true, true, true];
 
-/* ── Day chip — one per weekday ───────────────────── */
+/* ── Category pill — one per Sabaq / RMV / Review ─── */
+/* Exception-based default: pill shows "5/5" when every present day's
+   category is done. Tap to expand inline and toggle individual days. */
+
+interface CategoryPillProps {
+  label: string;             // "Sabaq" | "RMV" | "Review"
+  values: boolean[];         // length 5 (Mon..Fri)
+  absent: boolean[];         // length 5 — disabled cells
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onChangeDay: (dayIndex: number) => void;
+}
+
+function CategoryPill({ label, values, absent, expanded, onToggleExpand, onChangeDay }: CategoryPillProps) {
+  // Count only present days that were marked done
+  const presentDays = absent.filter((a) => !a).length;
+  const doneDays = values.filter((v, i) => v && !absent[i]).length;
+  const allDone = presentDays > 0 && doneDays === presentDays;
+  const someMissed = presentDays > 0 && doneDays < presentDays;
+
+  const tone = allDone
+    ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300/60 dark:border-emerald-700/40 text-emerald-700 dark:text-emerald-300"
+    : someMissed
+    ? "bg-amber-50 dark:bg-amber-950/20 border-amber-300/50 dark:border-amber-700/40 text-amber-700 dark:text-amber-300"
+    : "bg-secondary border-border/50 text-muted-foreground";
+
+  return (
+    <div className={`rounded-xl border-2 ${tone} transition-all`}>
+      <button
+        type="button"
+        onClick={onToggleExpand}
+        className="w-full flex items-center justify-between px-3 py-2 text-left"
+      >
+        <div className="flex flex-col">
+          <span className="text-[10px] font-extrabold uppercase tracking-widest opacity-70">{label}</span>
+          <span className="text-sm font-bold">
+            {allDone ? `✓ ${doneDays}/${presentDays}` : `${doneDays}/${presentDays}`}
+          </span>
+        </div>
+        {/* 5-day mini preview dots */}
+        <div className="flex items-center gap-1">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <span
+              key={i}
+              className={`inline-block w-1.5 h-1.5 rounded-full ${
+                absent[i] ? "bg-zinc-400/40" : values[i] ? "bg-current" : "bg-current/20"
+              }`}
+            />
+          ))}
+        </div>
+      </button>
+      {expanded && (
+        <div className="border-t border-current/10 px-2 py-2 grid grid-cols-5 gap-1">
+          {DAYS.map((day, i) => (
+            <button
+              key={day}
+              type="button"
+              disabled={absent[i]}
+              onClick={() => onChangeDay(i)}
+              className={`flex flex-col items-center py-1.5 rounded-md text-[10px] font-bold transition-all ${
+                absent[i]
+                  ? "opacity-40 cursor-not-allowed bg-zinc-500/10"
+                  : values[i]
+                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
+                  : "bg-secondary text-muted-foreground hover:bg-secondary/70"
+              }`}
+            >
+              <span className="uppercase tracking-wider">{day}</span>
+              <span className="text-base leading-none mt-0.5">{absent[i] ? "—" : values[i] ? "✓" : "·"}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Day chip (legacy — used to be the daily grid before category pills) ─ */
 
 interface DayChipProps {
   label: string;          // Mon, Tue, ...
@@ -311,8 +388,8 @@ export default function LogWeek() {
   const [notes, setNotes] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
-  // Per-day expansion: only the day the teacher is editing is open.
-  const [expandedDay, setExpandedDay] = useState<number | null>(null);
+  // Per-category expansion: only one pill open at a time.
+  const [expandedCategory, setExpandedCategory] = useState<"sabaq" | "rmv" | "review" | null>(null);
   // Position is set by tap-to-set in the mushaf preview. The numeric
   // page/line inputs are revealed only when the teacher hits "edit" — the
   // rare-case manual override.
@@ -1223,36 +1300,57 @@ export default function LogWeek() {
           </div>
         </div>
 
-        {/* ── Daily chips ── Assume-normal default: tap a day only when
-              something didn't go as expected. Chips expand inline. */}
+        {/* ── 3 category pills ── Exception-based: each pill defaults to
+              all 3 tasks done for every present day. Tap a pill to expand
+              and toggle individual days. Absent days are a separate row
+              below so they don't conflate with task completion. */}
         <div className={`bg-card rounded-2xl border border-border/50 p-3 mb-3 shadow-sm ${aiBorderClass("dailyGrid")}`}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest">Days</span>
+            <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest">Tasks</span>
             <span className="text-[10px] text-muted-foreground/70">
               {isAiFilled("dailyGrid")
                 ? "AI filled — tap to adjust"
-                : "Default: all 3 tasks done. Tap a day to mark exceptions."}
+                : "Default: all done. Tap a pill to mark exceptions."}
             </span>
           </div>
-          <div className="grid grid-cols-5 gap-1.5 items-start">
-            {DAYS.map((day, i) => (
-              <DayChip
-                key={day}
-                label={day}
-                sabaq={dailySabaq[i]}
-                rmv={dailyRmv[i]}
-                review={dailyReview[i]}
-                absent={dailyAbsent[i]}
-                expanded={expandedDay === i}
-                onToggleExpand={() => setExpandedDay((p) => (p === i ? null : i))}
-                onChange={(patch) => {
-                  if (patch.sabaq !== undefined) toggle(dailySabaq, i, setDailySabaq);
-                  if (patch.rmv !== undefined) toggle(dailyRmv, i, setDailyRmv);
-                  if (patch.review !== undefined) toggle(dailyReview, i, setDailyReview);
-                  if (patch.absent !== undefined) toggleAbsent(i);
-                }}
+          <div className="grid grid-cols-3 gap-1.5 items-start">
+            {[
+              { key: "sabaq" as const, label: "Sabaq", values: dailySabaq, setter: setDailySabaq },
+              { key: "rmv" as const, label: "RMV", values: dailyRmv, setter: setDailyRmv },
+              { key: "review" as const, label: "Review", values: dailyReview, setter: setDailyReview },
+            ].map((cat) => (
+              <CategoryPill
+                key={cat.key}
+                label={cat.label}
+                values={cat.values}
+                absent={dailyAbsent}
+                expanded={expandedCategory === cat.key}
+                onToggleExpand={() => setExpandedCategory((p) => (p === cat.key ? null : cat.key))}
+                onChangeDay={(i) => toggle(cat.values, i, cat.setter)}
               />
             ))}
+          </div>
+
+          {/* Absent days — compact toggles. Marking a day absent disables it
+              in all 3 category pills (existing toggleAbsent handles that). */}
+          <div className="mt-2 pt-2 border-t border-border/30 flex items-center gap-2">
+            <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest shrink-0">Absent</span>
+            <div className="grid grid-cols-5 gap-1 flex-1">
+              {DAYS.map((day, i) => (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => toggleAbsent(i)}
+                  className={`text-[10px] font-bold py-1 rounded-md transition-all ${
+                    dailyAbsent[i]
+                      ? "bg-zinc-500/20 text-foreground"
+                      : "bg-secondary/40 text-muted-foreground/60 hover:bg-secondary"
+                  }`}
+                >
+                  {day}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
