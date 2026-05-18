@@ -220,7 +220,7 @@ export function MushafPage({
         const lineClass = cn(
           "mushaf-line transition-colors relative",
           // Range fill (subtle background covering everything between anchor and endpoint)
-          inRange && !isHighlight && "rounded-md bg-emerald-50/70 dark:bg-emerald-950/20",
+          inRange && !isHighlight && "rounded-md bg-emerald-100 dark:bg-emerald-900/30",
           // Anchor — faint dashed left border indicator on the starting line
           isAnchor && !isHighlight && "border-l-2 border-dashed border-emerald-400/60",
           // Endpoint (bright ring)

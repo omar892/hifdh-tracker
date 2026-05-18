@@ -8,11 +8,12 @@ import { TOTAL_PAGES, getLinesForCompletedJuz, TOTAL_LINES } from "@/lib/quran-u
 import { getGenderAvatarClass, getGenderBorderClass, type Gender } from "@/lib/gender-colors";
 
 /** Mon-Wed = early (normal to be unlogged), Thu = mid, Fri+ = late (alarm). */
-function getWeekPhase(): "early" | "mid" | "late" {
-  const d = getDay(new Date()); // 0=Sun
-  if (d === 0 || d >= 5) return "late";
-  if (d === 4) return "mid";
-  return "early";
+function getWeekPhase(): "early" | "mid" | "late" | "weekend" {
+  const d = getDay(new Date()); // 0=Sun, 6=Sat
+  if (d === 0 || d === 6) return "weekend"; // school week is already over
+  if (d === 5) return "late"; // Friday — last chance to log live
+  if (d === 4) return "mid"; // Thursday
+  return "early"; // Mon–Wed
 }
 
 function WeekDots() {
@@ -126,26 +127,28 @@ export default function Dashboard() {
       {allUnlogged && (
         <div
           className={`mb-6 flex items-start gap-3 p-4 rounded-2xl border ${
-            weekPhase === "late"
+            weekPhase === "late" || weekPhase === "weekend"
               ? "bg-amber-500/5 border-amber-200 dark:border-amber-800/50"
               : weekPhase === "mid"
               ? "bg-muted/40 border-border"
               : "bg-muted/30 border-border/50"
           }`}
         >
-          {weekPhase === "late" ? (
+          {weekPhase === "late" || weekPhase === "weekend" ? (
             <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           ) : (
             <Clock className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
           )}
           <div className="flex-1">
             <p className={`text-sm font-bold ${
-              weekPhase === "late" ? "text-amber-700 dark:text-amber-300" : "text-foreground"
+              weekPhase === "late" || weekPhase === "weekend" ? "text-amber-700 dark:text-amber-300" : "text-foreground"
             }`}>
               No entries yet for {weekRange}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {weekPhase === "late"
+              {weekPhase === "weekend"
+                ? "Last week needs logging — catch up before Monday."
+                : weekPhase === "late"
                 ? "It’s late in the week — log entries today."
                 : weekPhase === "mid"
                 ? "Friday is tomorrow."
@@ -198,34 +201,35 @@ export default function Dashboard() {
                       <div className="absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -mr-8 -mt-8 bg-emerald-500/8 pointer-events-none" />
                     )}
 
-                    <div className="flex justify-between items-start mb-3 relative z-10">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${getGenderAvatarClass(student.gender as Gender)}`}>
-                          {student.name.charAt(0).toUpperCase()}
-                        </div>
-                        <h3 className="font-display font-bold text-lg text-foreground leading-tight tracking-tight truncate">{student.name}</h3>
+                    <div className="flex items-center gap-2.5 mb-3 relative z-10 pr-1">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${getGenderAvatarClass(student.gender as Gender)}`}>
+                        {student.name.charAt(0).toUpperCase()}
                       </div>
-                      {student.thisWeekDone ? (
-                        <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full text-[10px] font-extrabold shrink-0">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Done
-                        </span>
-                      ) : weekPhase === "early" ? (
-                        // Mon–Wed: not having logged yet is normal. Stay silent — no badge.
-                        null
-                      ) : weekPhase === "mid" ? (
-                        <span className="flex items-center gap-1 px-2 py-0.5 bg-muted text-muted-foreground rounded-full text-[10px] font-bold shrink-0">
-                          <Clock className="w-3 h-3" />
-                          Not yet
-                        </span>
-                      ) : (
-                        // Fri+: real signal
-                        <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-full text-[10px] font-extrabold shrink-0">
-                          <AlertCircle className="w-3 h-3" />
-                          Missing
-                        </span>
-                      )}
+                      <h3 className="font-display font-bold text-lg text-foreground leading-tight tracking-tight truncate min-w-0">{student.name}</h3>
                     </div>
+                    {/*
+                      Status indicator: icon-only dot in the top-right corner so
+                      the name gets the full card width. The colored icon (green
+                      check / amber alert / gray clock) carries the signal; the
+                      "Log this week" / "Edit entry" button below restates it.
+                    */}
+                    {student.thisWeekDone ? (
+                      <span aria-label="Done" title="Done" className="absolute top-3 right-3 z-20 w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      </span>
+                    ) : weekPhase === "early" ? (
+                      // Mon–Wed: not having logged yet is normal. Stay silent.
+                      null
+                    ) : weekPhase === "mid" ? (
+                      <span aria-label="Not yet" title="Not yet" className="absolute top-3 right-3 z-20 w-5 h-5 rounded-full bg-muted text-muted-foreground flex items-center justify-center">
+                        <Clock className="w-3.5 h-3.5" />
+                      </span>
+                    ) : (
+                      // Fri+/weekend: real signal — missing
+                      <span aria-label="Missing" title="Missing" className="absolute top-3 right-3 z-20 w-5 h-5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 flex items-center justify-center">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                      </span>
+                    )}
 
                     <div className="mt-auto relative z-10 space-y-1">
                       <div className="flex items-center justify-between">

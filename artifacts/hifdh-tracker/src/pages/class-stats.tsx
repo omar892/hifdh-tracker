@@ -154,6 +154,7 @@ export default function ClassStats() {
           <StatCard
             label="Active Students"
             value={stats?.totalStudents ?? 0}
+            sub="enrolled"
             icon={Users}
             color="text-primary"
           />
@@ -168,7 +169,7 @@ export default function ClassStats() {
           />
           <StatCard
             label="Lines Memorized"
-            scope="All-time (from completed juz)"
+            scope="All-time"
             value={(stats?.totalLinesMemorized ?? 0).toLocaleString()}
             sub="across the class"
             icon={BookOpen}
@@ -260,9 +261,10 @@ export default function ClassStats() {
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="mt-2">
+                  <div className="mt-2 flex items-baseline gap-2">
+                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">This week</p>
                     <p className="text-base font-bold text-foreground">{latestSuccess}%</p>
-                    {successFlat && <p className="text-[10px] text-muted-foreground font-medium">Consistent</p>}
+                    {successFlat && <p className="text-[10px] text-muted-foreground font-medium">· consistent</p>}
                   </div>
                 </div>
 
@@ -292,9 +294,10 @@ export default function ClassStats() {
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="mt-2">
+                  <div className="mt-2 flex items-baseline gap-2">
+                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">This week</p>
                     <p className="text-base font-bold text-foreground">{latestLines}</p>
-                    {linesFlat && <p className="text-[10px] text-muted-foreground font-medium">Consistent</p>}
+                    {linesFlat && <p className="text-[10px] text-muted-foreground font-medium">· consistent</p>}
                   </div>
                 </div>
 
@@ -326,9 +329,10 @@ export default function ClassStats() {
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="mt-2">
+                  <div className="mt-2 flex items-baseline gap-2">
+                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">This week</p>
                     <p className="text-base font-bold text-foreground">{latestRating}</p>
-                    {ratingFlat && <p className="text-[10px] text-muted-foreground font-medium">Consistent</p>}
+                    {ratingFlat && <p className="text-[10px] text-muted-foreground font-medium">· consistent</p>}
                   </div>
                 </div>
               </div>
@@ -354,7 +358,7 @@ export default function ClassStats() {
               {doneCount} of {totalStudents}
             </span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             {dashboard.map((s) => (
               <StudentLink key={s.id} id={s.id}>
                 <div
@@ -370,7 +374,7 @@ export default function ClassStats() {
                   ) : (
                     <Clock className="w-3.5 h-3.5 shrink-0" />
                   )}
-                  <span className="truncate">{s.name}</span>
+                  <span className="truncate" title={s.name}>{s.name.split(" ")[0]}</span>
                 </div>
               </StudentLink>
             ))}

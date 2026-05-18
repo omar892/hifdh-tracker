@@ -135,7 +135,8 @@ export default function StudentProfile() {
             <h1 className="font-display text-3xl md:text-4xl font-extrabold text-foreground tracking-tight leading-none">{student.name}</h1>
           </div>
           <p className="text-sm text-muted-foreground font-medium mt-1">
-            Working on: <span className="text-foreground font-semibold">Page {student.currentPage}, Line {student.currentLine}</span>
+            {stats && stats.currentStreakWeeks === 0 && (stats.weeksSinceLastEntry ?? 0) > 2 ? "Last position:" : "Working on:"}{" "}
+            <span className="text-foreground font-semibold">Page {student.currentPage}, Line {student.currentLine}</span>
           </p>
           {stats && (
             <div className="mt-3 flex items-center gap-2.5">
@@ -447,7 +448,7 @@ export default function StudentProfile() {
                       </>
                     ) : (
                       <p className="text-xs text-muted-foreground font-medium group-hover:text-primary transition-colors">
-                        Log this week \u2192
+                        Log this week →
                       </p>
                     )}
                   </button>

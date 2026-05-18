@@ -62,7 +62,7 @@ export default function Login() {
             <h1 className="font-display font-bold text-3xl text-foreground">Hifdh Tracker</h1>
           </div>
 
-          <div className="bg-card p-8 sm:p-10 rounded-3xl shadow-xl shadow-black/5 border border-border/50">
+          <div className="bg-card dark:bg-secondary p-8 sm:p-10 rounded-3xl shadow-xl shadow-black/5 dark:shadow-black/40 border border-border/50 dark:border-border">
             <div className="mb-8">
               <h2 className="font-display font-bold text-2xl text-foreground">Teacher Login</h2>
               <p className="text-muted-foreground mt-2">Enter your password to access the dashboard.</p>
@@ -79,7 +79,7 @@ export default function Login() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-11 pr-4 py-4 bg-secondary border-2 border-transparent focus:border-primary focus:bg-background rounded-xl outline-none transition-all text-foreground"
+                    className="w-full pl-11 pr-4 py-4 bg-secondary dark:bg-background border-2 border-transparent dark:border-border focus:border-primary focus:bg-background rounded-xl outline-none transition-all text-foreground"
                     placeholder="Enter teacher password"
                     required
                   />

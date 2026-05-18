@@ -450,6 +450,35 @@ export default function LogWeek() {
     return prevEntries[0];
   })();
 
+  // Anchor = the student's position at the START of this week. Resolution order:
+  //   1. lastEntry (prior week's saved endpoint) — the normal case
+  //   2. In edit mode, if no prior entry has a known position AND student.currentPage
+  //      equals the entry being edited's endpoint, the student record was clobbered
+  //      by this entry's save — recover the original anchor by subtracting the
+  //      entry's own memorizationLines. (15 lines per Madani page.)
+  //   3. student.currentPage — the seed/initial position (new entry only)
+  //   4. 1/1 — last-resort fallback
+  const anchor = (() => {
+    if (lastEntry?.currentPage != null && lastEntry.currentLine != null) {
+      return { page: lastEntry.currentPage, line: lastEntry.currentLine };
+    }
+    if (
+      existingEntry &&
+      existingEntry.currentPage != null &&
+      existingEntry.currentLine != null &&
+      student?.currentPage === existingEntry.currentPage &&
+      student?.currentLine === existingEntry.currentLine
+    ) {
+      const deltaLines = existingEntry.memorizationLines ?? 0;
+      let page = existingEntry.currentPage;
+      let line = existingEntry.currentLine - deltaLines;
+      while (line < 1 && page > 1) { line += 15; page -= 1; }
+      if (line < 1) line = 1;
+      return { page, line };
+    }
+    return { page: student?.currentPage ?? 1, line: student?.currentLine ?? 1 };
+  })();
+
   // Form state
   const [memorizationLines, setMemorizationLines] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -907,10 +936,7 @@ export default function LogWeek() {
     // Derive lines from the position diff vs. last week's anchor. The teacher
     // sets position via tap-to-set on the mushaf; lines are computed, not
     // typed. 15 lines per Madani page is the simple model used here.
-    // lastEntry is filtered above to skip the entry being edited (if any).
-    const anchorPage = lastEntry?.currentPage ?? student?.currentPage ?? 1;
-    const anchorLine = lastEntry?.currentLine ?? student?.currentLine ?? 1;
-    const derivedLines = Math.max(0, (currentPage - anchorPage) * 15 + (currentLine - anchorLine));
+    const derivedLines = Math.max(0, (currentPage - anchor.page) * 15 + (currentLine - anchor.line));
 
     try {
       await upsert.mutateAsync({
@@ -1083,7 +1109,7 @@ export default function LogWeek() {
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-l-xl border-2 font-bold text-sm transition-all ${
               entryMode === "manual"
                 ? "bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20"
-                : "bg-card text-muted-foreground border-border/50 hover:border-border"
+                : "bg-transparent text-muted-foreground border-border/50 hover:border-border hover:bg-muted/30"
             }`}
           >
             <PenLine className="w-4 h-4" /> Manual Entry
@@ -1094,7 +1120,7 @@ export default function LogWeek() {
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-r-xl border-2 border-l-0 font-bold text-sm transition-all ${
               entryMode === "ai"
                 ? "bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20"
-                : "bg-card text-muted-foreground border-border/50 hover:border-border"
+                : "bg-transparent text-muted-foreground border-border/50 hover:border-border hover:bg-muted/30"
             }`}
           >
             <Mic className="w-4 h-4" /> AI Entry
@@ -1243,12 +1269,11 @@ export default function LogWeek() {
 
         {/* ── Position: mushaf preview is the primary input, summary below ── */}
         {(() => {
-          // Anchor = position at the START of this week = END of the week
-          // before. lastEntry above already excludes the entry being edited
-          // (if any), so this works for both new and edit modes. Falls back
-          // to student initial position when no prior entry exists.
-          const anchorPage = lastEntry?.currentPage ?? student?.currentPage ?? 1;
-          const anchorLine = lastEntry?.currentLine ?? student?.currentLine ?? 1;
+          // Anchor source priority is in the `anchor` memo above the JSX —
+          // handles new entries, edit-mode, and the post-save-clobber case
+          // where student.currentPage equals the entry being edited.
+          const anchorPage = anchor.page;
+          const anchorLine = anchor.line;
           const linesDelta = (currentPage - anchorPage) * 15 + (currentLine - anchorLine);
           const mushafPref = (student?.mushafPreference ?? "madani_15") as "madani_15" | "indopak_15";
 
