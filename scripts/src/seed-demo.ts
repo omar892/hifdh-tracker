@@ -16,7 +16,7 @@
  *   SEED_CONFIRM=yes pnpm --filter @workspace/scripts run seed-demo
  */
 
-import { db, pool, studentsTable, weeklyEntriesTable } from "@workspace/db";
+import { db, pool, studentsTable, weeklyEntriesTable, mushafsTable } from "@workspace/db";
 
 type Rating =
   | "excellent"
@@ -277,6 +277,19 @@ async function main() {
   console.log(`[seed-demo] Wiping weekly_entries + students…`);
   await db.delete(weeklyEntriesTable);
   await db.delete(studentsTable);
+
+  // Ensure the mushaf catalog rows exist before students reference them. The
+  // quranApiId values match QF's mushaf IDs (1 = Hafs Uthmani v2 / Madani, 16
+  // = Indo-Pak Nastaleeq). `quran:sync` will refresh these with authoritative
+  // values + populate mushaf_pages. Idempotent via ON CONFLICT DO NOTHING.
+  console.log(`[seed-demo] Ensuring mushafs catalog…`);
+  await db
+    .insert(mushafsTable)
+    .values([
+      { id: "madani_15", quranApiId: 1, displayName: "Madani 15-Line", totalPages: 604 },
+      { id: "indopak_15", quranApiId: 16, displayName: "Indo-Pak 15-Line", totalPages: 610 },
+    ])
+    .onConflictDoNothing();
 
   for (const profile of PROFILES) {
     const rand = seededRandom(profile.name);
