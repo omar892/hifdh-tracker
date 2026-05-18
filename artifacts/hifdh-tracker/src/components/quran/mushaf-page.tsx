@@ -64,9 +64,13 @@ interface MushafPageProps {
 
 const FONT_BASES = {
   madani_15: "https://verses.quran.foundation/fonts/quran/hafs/v2/woff2",
-  // Indo-Pak fonts live under a different path; QF docs list these CDN prefixes.
-  // If wrong, sync.ts logs would also flag the mushaf ID mismatch.
-  indopak_15: "https://verses.quran.foundation/fonts/quran/indopak/v1/woff2",
+  // Indo-Pak rendering is structurally different: the QF API returns
+  // code_v2 (QCF glyph codes) for Madani only; for Indo-Pak the correct
+  // path is to render text_indopak with a single global Nastaleeq font.
+  // This is a TODO — current code uses code_v2 + per-page font which
+  // doesn't apply. Until refactored, MushafPage shows a clear notice
+  // instead of a stuck skeleton when mushafId is indopak_15.
+  indopak_15: "" as const, // placeholder — not actually used; see render guard below
 } as const;
 
 /** Ensure the per-page font is registered with document.fonts. Idempotent. */
@@ -153,6 +157,21 @@ export function MushafPage({
         Couldn’t load page {pageNumber}: {(error as Error)?.message ?? "unknown error"}
         <p className="mt-1 text-xs text-muted-foreground">
           Check that the API server is reachable and that <code>QURAN_CLIENT_ID</code>/<code>QURAN_CLIENT_SECRET</code> are set.
+        </p>
+      </div>
+    );
+  }
+
+  // Indo-Pak rendering isn't wired up yet (different font architecture —
+  // single Nastaleeq font + text_indopak field, not per-page QCF glyphs).
+  // Show an explicit notice instead of a stuck skeleton so teachers using
+  // the Indo-Pak Mushaf know the visual isn't broken, just deferred.
+  if (mushafId === "indopak_15") {
+    return (
+      <div className={cn("rounded-lg border bg-muted/30 p-6 text-center text-sm", className)}>
+        <p className="font-bold text-foreground mb-1">Page {pageNumber}</p>
+        <p className="text-muted-foreground text-xs">
+          Indo-Pak Mushaf rendering coming soon. Position tracking still works — switch to Madani 15-Line in the student profile for the live page preview.
         </p>
       </div>
     );

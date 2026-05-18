@@ -103,14 +103,14 @@ function CategoryPill({ label, values, absent, expanded, onToggleExpand, onChang
         </div>
       </button>
       {expanded && (
-        <div className="border-t border-current/10 px-2 py-2 grid grid-cols-5 gap-1">
+        <div className="border-t border-current/10 px-2 py-2 grid grid-cols-5 gap-1.5">
           {DAYS.map((day, i) => (
             <button
               key={day}
               type="button"
               disabled={absent[i]}
               onClick={() => onChangeDay(i)}
-              className={`flex flex-col items-center py-1.5 rounded-md text-[10px] font-bold transition-all ${
+              className={`flex flex-col items-center justify-center px-1 py-1.5 rounded-md text-[10px] font-bold transition-all min-w-0 ${
                 absent[i]
                   ? "opacity-40 cursor-not-allowed bg-zinc-500/10"
                   : values[i]
@@ -118,7 +118,10 @@ function CategoryPill({ label, values, absent, expanded, onToggleExpand, onChang
                   : "bg-secondary text-muted-foreground hover:bg-secondary/70"
               }`}
             >
-              <span className="uppercase tracking-wider">{day}</span>
+              {/* tracking-normal so MON/TUE letters stay inside the cell at
+                  narrow widths; the visible "jammed labels" bug came from
+                  tracking-wider + tight gap on small columns. */}
+              <span className="uppercase tracking-normal">{day}</span>
               <span className="text-base leading-none mt-0.5">{absent[i] ? "—" : values[i] ? "✓" : "·"}</span>
             </button>
           ))}
@@ -144,7 +147,7 @@ interface ScopeChipProps {
 
 function ScopeChip({ label, value, placeholder, onChange, aiBorder, aiFilled }: ScopeChipProps) {
   const [editing, setEditing] = useState(false);
-  const displayValue = value || placeholder || "—";
+  const hasValue = !!value;
   return (
     <div className={`inline-flex items-center gap-2 rounded-full border ${aiBorder ?? "border-border/50"} bg-card px-3 py-1.5 shadow-sm`}>
       <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">{label}</span>
@@ -160,13 +163,27 @@ function ScopeChip({ label, value, placeholder, onChange, aiBorder, aiFilled }: 
           className="bg-background border border-border rounded-md px-2 py-0.5 text-xs font-medium outline-none focus:border-primary min-w-[120px]"
         />
       ) : (
+        // The chip honestly distinguishes "has a value" from "empty,
+        // suggested = X". Tapping the chip opens the input; if empty, the
+        // input shows the placeholder so the teacher can see the suggestion.
+        // Tapping "use" commits the placeholder as the value.
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="text-xs font-bold text-foreground hover:text-primary transition-colors flex items-center gap-1"
+          className={`text-xs font-bold transition-colors flex items-center gap-1 ${hasValue ? "text-foreground hover:text-primary" : "text-muted-foreground/70 hover:text-foreground"}`}
         >
-          {displayValue}
+          {hasValue ? value : <span className="italic">not set{placeholder ? ` · ${placeholder}?` : ""}</span>}
           <PenLine className="w-3 h-3 opacity-50" />
+        </button>
+      )}
+      {!editing && !hasValue && placeholder && (
+        <button
+          type="button"
+          onClick={() => onChange(placeholder)}
+          className="text-[10px] font-bold text-primary hover:text-primary/80 px-1.5 py-0.5 rounded-md hover:bg-primary/10 transition-colors"
+          aria-label={`Use suggested ${placeholder}`}
+        >
+          use
         </button>
       )}
       {aiFilled && <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">AI</span>}
@@ -410,13 +427,28 @@ export default function LogWeek() {
     { query: { queryKey: getGetWeeklyEntryQueryKey(student?.id ?? 0, weekStartStr), enabled: !!student?.id, retry: false } }
   );
 
-  const prevParams = { limit: 1 };
+  // Fetch the 2 most recent entries so we can find the correct anchor in
+  // edit mode too: when editing an existing entry, the anchor is the entry
+  // BEFORE that one (not student.currentPage, which equals the entry being
+  // edited). limit=2 covers both cases:
+  //   - new entry: prevEntries[0] is the previous week
+  //   - editing existing: prevEntries[0] is the entry being edited; we use
+  //     prevEntries[1] (the week before).
+  const prevParams = { limit: 2 };
   const { data: prevEntries } = useListWeeklyEntries(
     student?.id ?? 0,
     prevParams,
-    { query: { queryKey: getListWeeklyEntriesQueryKey(student?.id ?? 0, prevParams), enabled: !!student?.id && !existingEntry } }
+    { query: { queryKey: getListWeeklyEntriesQueryKey(student?.id ?? 0, prevParams), enabled: !!student?.id } }
   );
-  const lastEntry = prevEntries?.[0];
+  // lastEntry = the entry that ENDED before this week's start.
+  const lastEntry = (() => {
+    if (!prevEntries) return undefined;
+    if (existingEntry) {
+      // Skip the entry whose week matches this week (the one being edited).
+      return prevEntries.find((e) => e.weekStartDate !== weekStartStr);
+    }
+    return prevEntries[0];
+  })();
 
   // Form state
   const [memorizationLines, setMemorizationLines] = useState(0);
@@ -875,12 +907,9 @@ export default function LogWeek() {
     // Derive lines from the position diff vs. last week's anchor. The teacher
     // sets position via tap-to-set on the mushaf; lines are computed, not
     // typed. 15 lines per Madani page is the simple model used here.
-    const anchorPage = existingEntry
-      ? (student?.currentPage ?? 1)
-      : (lastEntry?.currentPage ?? student?.currentPage ?? 1);
-    const anchorLine = existingEntry
-      ? (student?.currentLine ?? 1)
-      : (lastEntry?.currentLine ?? student?.currentLine ?? 1);
+    // lastEntry is filtered above to skip the entry being edited (if any).
+    const anchorPage = lastEntry?.currentPage ?? student?.currentPage ?? 1;
+    const anchorLine = lastEntry?.currentLine ?? student?.currentLine ?? 1;
     const derivedLines = Math.max(0, (currentPage - anchorPage) * 15 + (currentLine - anchorLine));
 
     try {
@@ -1214,16 +1243,12 @@ export default function LogWeek() {
 
         {/* ── Position: mushaf preview is the primary input, summary below ── */}
         {(() => {
-          // Anchor = last week's endpoint. For a NEW entry this is the most-recent
-          // weekly entry; for an EDIT of an existing entry it's the student's stored
-          // position (set from the entry before this one). Falls back to student
-          // initial position if no entries exist yet.
-          const anchorPage = existingEntry
-            ? (student?.currentPage ?? 1)
-            : (lastEntry?.currentPage ?? student?.currentPage ?? 1);
-          const anchorLine = existingEntry
-            ? (student?.currentLine ?? 1)
-            : (lastEntry?.currentLine ?? student?.currentLine ?? 1);
+          // Anchor = position at the START of this week = END of the week
+          // before. lastEntry above already excludes the entry being edited
+          // (if any), so this works for both new and edit modes. Falls back
+          // to student initial position when no prior entry exists.
+          const anchorPage = lastEntry?.currentPage ?? student?.currentPage ?? 1;
+          const anchorLine = lastEntry?.currentLine ?? student?.currentLine ?? 1;
           const linesDelta = (currentPage - anchorPage) * 15 + (currentLine - anchorLine);
           const mushafPref = (student?.mushafPreference ?? "madani_15") as "madani_15" | "indopak_15";
 
@@ -1240,10 +1265,13 @@ export default function LogWeek() {
                 defaultOpen
               />
 
-              {/* Computed summary — replaces the stepper + numeric position fields */}
-              <div className={`bg-card rounded-2xl border border-border/50 px-4 py-2.5 mb-3 shadow-sm flex items-center gap-3 ${aiBorderClass("memorizationLines")}`}>
+              {/* Computed summary — replaces the stepper + numeric position fields.
+                  Negative delta = endpoint set BEFORE the anchor. We clamp the
+                  saved value to 0 (see handleSubmit) and surface a warning
+                  here so display and save agree on what gets recorded. */}
+              <div className={`bg-card rounded-2xl border ${linesDelta < 0 ? "border-amber-300 dark:border-amber-700/60" : "border-border/50"} px-4 py-2.5 mb-3 shadow-sm flex items-center gap-3 ${aiBorderClass("memorizationLines")}`}>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2">
+                  <div className="flex items-baseline gap-2 flex-wrap">
                     <span
                       className={`text-lg font-extrabold tracking-tight ${
                         linesDelta > 0
@@ -1266,6 +1294,11 @@ export default function LogWeek() {
                   <p className="text-[10px] text-muted-foreground/70 mt-0.5">
                     From page {anchorPage}, line {anchorLine} (last week)
                   </p>
+                  {linesDelta < 0 && (
+                    <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300 mt-1">
+                      Endpoint is before last week — will save as 0 lines. Use Edit if last week's position was wrong.
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
