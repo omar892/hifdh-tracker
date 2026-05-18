@@ -46,8 +46,17 @@ export function MushafPreviewPanel({
   const mushafLabel = mushafId === "madani_15" ? "Madani 15-Line" : "Indo-Pak 15-Line";
   const maxP = maxPage ?? (mushafId === "madani_15" ? 604 : 610);
 
-  const canPrev = !!onPageChange && page > 1;
-  const canNext = !!onPageChange && page < maxP;
+  // Spread mode: anchor and endpoint are on different pages and anchor
+  // is earlier in the book. In spread mode the page-navigation chevrons
+  // are hidden — pages shown are dictated entirely by the data so they
+  // can't fall out of sync. Use the position-summary Edit button to
+  // change pages manually.
+  const isSpread = anchorPage !== undefined && anchorPage !== page && anchorPage < page;
+  const pagesInRange: number[] = isSpread
+    ? Array.from({ length: page - anchorPage! + 1 }, (_, i) => anchorPage! + i)
+    : [page];
+  const canPrev = !!onPageChange && page > 1 && !isSpread;
+  const canNext = !!onPageChange && page < maxP && !isSpread;
 
   return (
     <div className="mb-3 rounded-2xl border border-border/50 bg-card shadow-sm">
@@ -62,11 +71,13 @@ export function MushafPreviewPanel({
             Mushaf preview
           </span>
           <span className="text-xs text-muted-foreground/70">
-            {mushafLabel} · page {page}
-            {line ? ` · line ${line}` : ""}
+            {mushafLabel}
+            {isSpread
+              ? ` · pages ${anchorPage}–${page} · line ${line ?? ""}`
+              : ` · page ${page}${line ? ` · line ${line}` : ""}`}
           </span>
         </button>
-        {open && onPageChange && (
+        {open && onPageChange && !isSpread && (
           <div className="mr-2 flex items-center gap-1">
             <button
               type="button"
@@ -102,32 +113,33 @@ export function MushafPreviewPanel({
       </div>
       {open && (
         <div className="border-t border-border/50 p-3">
-          {/* When the week's range crosses a page boundary, render BOTH
-              pages side-by-side. The anchor page is contextual (shows the
-              start + tail of the prior page); the endpoint page is the
-              tappable surface. Same-page case shows just one page. */}
-          {anchorPage !== undefined && anchorPage !== page && anchorPage < page ? (
-            // Stack vertically on iPad portrait (≤1024px wide); side-by-side
-            // on landscape / desktop where each column has enough width to
-            // read the Arabic comfortably.
+          {isSpread ? (
+            // Render EVERY page in the range — anchor, all middles, endpoint.
+            // Stack vertically on iPad portrait; side-by-side from lg up.
+            // Per-page navigation removed: the rendered pages are dictated
+            // by anchor + endpoint, not user clicks.
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {/* Anchor page — read-only, range from anchorLine to the rest of the page */}
-              <MushafPage
-                mushafId={mushafId}
-                pageNumber={anchorPage}
-                anchorLine={anchorLine}
-                highlightRange={anchorLine !== undefined ? [anchorLine, 15] : undefined}
-                fontSize="sm"
-              />
-              {/* Endpoint page — tappable, range from line 1 to endpoint */}
-              <MushafPage
-                mushafId={mushafId}
-                pageNumber={page}
-                highlightLine={line}
-                highlightRange={line !== undefined ? [1, line] : undefined}
-                onSelectLine={onSelectLine}
-                fontSize="sm"
-              />
+              {pagesInRange.map((p) => {
+                const isFirst = p === anchorPage;
+                const isLast = p === page;
+                const range: [number, number] | undefined = isFirst
+                  ? [anchorLine ?? 1, 15]
+                  : isLast
+                    ? [1, line ?? 15]
+                    : [1, 15];
+                return (
+                  <MushafPage
+                    key={p}
+                    mushafId={mushafId}
+                    pageNumber={p}
+                    anchorLine={isFirst ? anchorLine : undefined}
+                    highlightLine={isLast ? line : undefined}
+                    highlightRange={range}
+                    onSelectLine={isLast ? onSelectLine : undefined}
+                    fontSize="sm"
+                  />
+                );
+              })}
             </div>
           ) : (
             <MushafPage
