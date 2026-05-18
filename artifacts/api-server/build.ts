@@ -12,7 +12,10 @@ const __dirname = path.dirname(__filename);
 const allowlist = [
   "@google/generative-ai",
   "axios",
-  "connect-pg-simple",
+  // connect-pg-simple intentionally EXCLUDED: it ships a table.sql file that
+  // it loads at runtime via fs.readFile (for createTableIfMissing). Bundling
+  // its JS into index.cjs breaks that lookup. Leaving it external means the
+  // runtime require() finds it in node_modules with the SQL file intact.
   "cors",
   "date-fns",
   "drizzle-orm",
