@@ -25,6 +25,13 @@ import {
 } from "lucide-react";
 import { getGenderAvatarClass, type Gender } from "@/lib/gender-colors";
 import { formatLines } from "@/lib/format";
+import {
+  StatusBadge,
+  AttendanceCard,
+  GuardiansSection,
+  ParentLinkSection,
+} from "@/components/student-record/record-sections";
+import type { StudentStatus, AttendanceSummary } from "@/hooks/use-student-record";
 
 const RATING_COLORS: Record<string, string> = {
   excellent: "bg-yellow-500",
@@ -129,11 +136,17 @@ export default function StudentProfile() {
 
         {/* Hero */}
         <div className="bg-gradient-to-br from-emerald-500/8 via-emerald-500/3 to-transparent rounded-3xl p-5 mb-6 border border-emerald-500/10">
-          <div className="flex items-center gap-3 mb-1">
+          <div className="flex items-center gap-3 mb-1 flex-wrap">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold shrink-0 ${getGenderAvatarClass((student as any).gender as Gender)}`}>
               {student.name.charAt(0).toUpperCase()}
             </div>
             <h1 className="font-display text-3xl md:text-4xl font-extrabold text-foreground tracking-tight leading-none">{student.name}</h1>
+            {/* Status badge — drives "Active / Paused / Graduated / Withdrawn".
+                Falls back to legacy active boolean during the transition window. */}
+            <StatusBadge
+              status={((stats as { status?: StudentStatus } | undefined)?.status ?? (student.active ? "active" : "withdrawn")) as StudentStatus}
+              studentId={studentId}
+            />
           </div>
           <p className="text-sm text-muted-foreground font-medium mt-1">
             {stats && stats.currentStreakWeeks === 0 && (stats.weeksSinceLastEntry ?? 0) > 2 ? "Last position:" : "Working on:"}{" "}
@@ -227,8 +240,22 @@ export default function StudentProfile() {
               icon={Calendar}
               color="text-blue-500"
             />
+            {/* Attendance is derived from existing dailyAbsent arrays — see
+                routes/stats.ts. It's a 6th card in the grid so the eye reads
+                it alongside Success Rate / This Month / etc. */}
+            <AttendanceCard
+              recent={(stats as { attendanceLast4Weeks?: AttendanceSummary }).attendanceLast4Weeks}
+              allTime={(stats as { attendanceAllTime?: AttendanceSummary }).attendanceAllTime}
+            />
           </div>
         )}
+
+        {/* Guardians + Parent Link — the "this is a real student record"
+            sections. Two columns on tablet+. */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+          <GuardiansSection studentId={studentId} />
+          <ParentLinkSection studentId={studentId} />
+        </div>
 
         {/* Projections */}
         {projections && projections.paceRecent > 0 && (
