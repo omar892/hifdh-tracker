@@ -97,15 +97,68 @@ interface Profile {
   onlyRecentWeeks?: number;
 }
 
+// Pace is in LINES/WEEK (Madani: 15 lines per page).
+// Calibrated to realistic full-time hifz program cadence:
+//   - 20+ juz students: 1-2 pages/day = 5-10 pages/wk = 75-150 lines/wk
+//   - 5-20 juz students: 0.5-1 page/day = 38-75 lines/wk
+//   - Struggling/new: less, with high variance
+// Start pages chosen so 8 weeks of seeded weekly entries land each student
+// near their target juz total. The 8-week window then ends up crossing
+// real juz boundaries, which makes the recent-weeks data demo-worthy.
 const PROFILES: Profile[] = [
+  {
+    name: "Omar Abdullah",
+    gender: "male",
+    mushaf: "madani_15",
+    startDate: "2023-08-15",
+    // Target: ~20 juz done, currently in juz 21 (page 402-421). 8 weeks at
+    // ~120 lines/wk = 64 pages, so startPage ~340 (juz 17) → ends ~juz 21.
+    startPage: 341,
+    startLine: 1,
+    pace: [90, 120, 150], // ~1.5 pages/day — full-time hafidh pace
+    exceptionRate: 0.05,
+    ratingDist: [0.6, 0.3, 0.1, 0, 0],
+    defaultRmv: "Last 1 Juz",
+    defaultReview: "2 Juz",
+    notes: "Class topper — pushing for full Quran by year end",
+  },
+  {
+    name: "Zainab Ali",
+    gender: "female",
+    mushaf: "madani_15",
+    startDate: "2023-06-01",
+    // Target: ~18 juz done (currently mid juz 19). ~100 lines/wk × 8 = ~53 pages.
+    startPage: 312,
+    startLine: 1,
+    pace: [75, 100, 130],
+    exceptionRate: 0.06,
+    ratingDist: [0.5, 0.35, 0.15, 0, 0],
+    defaultRmv: "Last 1 Juz",
+    defaultReview: "2 Juz",
+  },
+  {
+    name: "Fatima Hassan",
+    gender: "female",
+    mushaf: "madani_15",
+    startDate: "2023-09-01",
+    // Target: ~16 juz done (juz 17 ~ page 322-341). ~80 lines/wk × 8 = ~43 pages.
+    startPage: 282,
+    startLine: 8,
+    pace: [60, 80, 105],
+    exceptionRate: 0.1,
+    ratingDist: [0.3, 0.4, 0.25, 0.05, 0],
+    defaultRmv: "Last 10 pages",
+    defaultReview: "1 Juz",
+  },
   {
     name: "Ahmed Al-Rashid",
     gender: "male",
     mushaf: "madani_15",
     startDate: "2024-09-01",
-    startPage: 102,
+    // Target: ~10 juz done (juz 11 ~ page 201). ~65 lines/wk × 8 = ~35 pages.
+    startPage: 170,
     startLine: 1,
-    pace: [12, 18, 24],
+    pace: [50, 65, 85],
     exceptionRate: 0.08,
     ratingDist: [0.4, 0.35, 0.2, 0.05, 0],
     defaultRmv: "Last 10 pages",
@@ -113,26 +166,26 @@ const PROFILES: Profile[] = [
     notes: "Strong memorization, needs work on tajweed",
   },
   {
-    name: "Fatima Hassan",
+    name: "Aisha Rahman",
     gender: "female",
     mushaf: "madani_15",
-    startDate: "2023-09-01",
-    startPage: 278,
-    startLine: 8,
-    pace: [10, 14, 18],
-    exceptionRate: 0.12,
-    ratingDist: [0.2, 0.4, 0.3, 0.1, 0],
-    defaultRmv: "Last 5 pages",
-    defaultReview: "Half Juz",
+    startDate: "2023-11-01",
+    // Target: ~8 juz done (juz 9 ~ page 162). ~55 lines/wk × 8 = ~29 pages.
+    startPage: 141,
+    startLine: 6,
+    pace: [40, 55, 70],
+    exceptionRate: 0.2,
+    ratingDist: [0.15, 0.25, 0.3, 0.2, 0.1],
   },
   {
     name: "Yusuf Ibrahim",
     gender: "male",
     mushaf: "madani_15",
     startDate: "2024-01-15",
-    startPage: 135,
+    // Target: ~7 juz done (juz 8 ~ page 142). ~50 lines/wk × 8 = ~27 pages.
+    startPage: 118,
     startLine: 5,
-    pace: [8, 12, 16],
+    pace: [38, 50, 65],
     exceptionRate: 0.15,
     ratingDist: [0.1, 0.3, 0.4, 0.15, 0.05],
     defaultRmv: "Last 5 pages",
@@ -143,47 +196,38 @@ const PROFILES: Profile[] = [
     gender: "female",
     mushaf: "madani_15",
     startDate: "2024-02-01",
-    startPage: 115,
+    // Target: ~6 juz done (juz 7 ~ page 121). Paused 5 weeks ago → only 3
+    // weeks of entries at ~55 lines/wk = ~11 pages of advance.
+    startPage: 110,
     startLine: 3,
-    pace: [10, 14, 18],
+    pace: [40, 55, 70],
     exceptionRate: 0.1,
-    ratingDist: [0.2, 0.4, 0.3, 0.1, 0],
+    ratingDist: [0.25, 0.4, 0.25, 0.1, 0],
     skipRecentWeeks: 5,
     notes: "Travel — out of state for family event",
   },
   {
-    name: "Omar Abdullah",
-    gender: "male",
-    mushaf: "madani_15",
-    startDate: "2023-08-15",
-    startPage: 275,
-    startLine: 1,
-    pace: [15, 22, 28],
-    exceptionRate: 0.05,
-    ratingDist: [0.5, 0.35, 0.15, 0, 0],
-    defaultRmv: "Last 15 pages",
-    defaultReview: "2 Juz",
-    notes: "Class topper — pushing for full Quran by year end",
-  },
-  {
-    name: "Aisha Rahman",
+    name: "Khadija Iqbal",
     gender: "female",
     mushaf: "madani_15",
-    startDate: "2023-11-01",
-    startPage: 152,
-    startLine: 6,
-    pace: [8, 13, 18],
-    exceptionRate: 0.2,
-    ratingDist: [0.15, 0.2, 0.3, 0.25, 0.1],
+    startDate: "2024-04-15",
+    // Target: ~4 juz done (juz 5 ~ page 82). ~45 lines/wk × 8 = ~24 pages.
+    startPage: 56,
+    startLine: 1,
+    pace: [30, 45, 60],
+    exceptionRate: 0.15,
+    ratingDist: [0.15, 0.3, 0.3, 0.2, 0.05],
   },
   {
     name: "Bilal Mustafa",
     gender: "male",
     mushaf: "madani_15",
     startDate: "2024-03-01",
-    startPage: 52,
+    // Target: ~2 juz done (juz 3 starts page 42). Struggling — much slower
+    // pace than peers, ~20 lines/wk × 8 = ~11 pages.
+    startPage: 42,
     startLine: 1,
-    pace: [4, 7, 10],
+    pace: [12, 20, 32],
     exceptionRate: 0.25,
     ratingDist: [0.05, 0.15, 0.3, 0.35, 0.15],
     defaultRmv: "Last 3 pages",
@@ -191,41 +235,18 @@ const PROFILES: Profile[] = [
     notes: "Catching up after late start — daily 1:1 in afternoon",
   },
   {
-    name: "Zainab Ali",
-    gender: "female",
-    mushaf: "madani_15",
-    startDate: "2023-06-01",
-    startPage: 295,
-    startLine: 1,
-    pace: [14, 20, 26],
-    exceptionRate: 0.08,
-    ratingDist: [0.35, 0.4, 0.2, 0.05, 0],
-    defaultRmv: "Last 10 pages",
-    defaultReview: "1 Juz",
-  },
-  {
     name: "Hassan Siddiqui",
     gender: "male",
     mushaf: "madani_15",
     startDate: "2026-05-01",
+    // Brand new, only 2 weeks logged. Just starting on Surah Al-Fatihah.
     startPage: 1,
     startLine: 1,
-    pace: [3, 5, 8],
+    pace: [4, 8, 14],
     exceptionRate: 0.1,
     ratingDist: [0.1, 0.3, 0.5, 0.1, 0],
     onlyRecentWeeks: 2,
-    notes: "New student — starting Surah Fatihah this month",
-  },
-  {
-    name: "Khadija Iqbal",
-    gender: "female",
-    mushaf: "madani_15",
-    startDate: "2024-04-15",
-    startPage: 95,
-    startLine: 1,
-    pace: [10, 14, 18],
-    exceptionRate: 0.15,
-    ratingDist: [0.2, 0.3, 0.3, 0.15, 0.05],
+    notes: "New student — starting Surah Al-Fatihah this month",
   },
 ];
 
@@ -312,7 +333,10 @@ async function main() {
   const currentMonday = mondayOf(today);
 
   console.log(`[seed-demo] Anchoring at today=${isoDate(today)}, currentMonday=${isoDate(currentMonday)}`);
-  console.log(`[seed-demo] Wiping weekly_entries + students…`);
+  console.log(`[seed-demo] Wiping student_completed_juz + weekly_entries + students…`);
+  // Order matters: both child tables FK to students with no ON DELETE CASCADE,
+  // so they have to go first.
+  await db.delete(studentCompletedJuzTable);
   await db.delete(weeklyEntriesTable);
   await db.delete(studentsTable);
 
