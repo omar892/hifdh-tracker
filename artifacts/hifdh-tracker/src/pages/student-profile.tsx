@@ -24,6 +24,7 @@ import {
   Target,
 } from "lucide-react";
 import { getGenderAvatarClass, type Gender } from "@/lib/gender-colors";
+import { formatLines } from "@/lib/format";
 
 const RATING_COLORS: Record<string, string> = {
   excellent: "bg-yellow-500",
@@ -186,7 +187,7 @@ export default function StudentProfile() {
             <StatCard
               label="Juz Completed"
               value={`${stats.juzCompleted}/30`}
-              sub={`${stats.totalLinesMemorized.toLocaleString()} lines`}
+              sub={formatLines(stats.totalLinesMemorized, { showRemainder: false })}
               icon={BookOpen}
               color="text-primary"
             />
@@ -214,15 +215,15 @@ export default function StudentProfile() {
             />
             <StatCard
               label="This Month"
-              value={stats.linesThisMonth}
-              sub="lines"
+              value={formatLines(stats.linesThisMonth, { short: true })}
+              sub={stats.linesThisMonth >= 15 ? `${stats.linesThisMonth} lines total` : "this month"}
               icon={Star}
               color="text-yellow-500"
             />
             <StatCard
               label="Last Month"
-              value={stats.linesLastMonth}
-              sub="lines"
+              value={formatLines(stats.linesLastMonth, { short: true })}
+              sub={stats.linesLastMonth >= 15 ? `${stats.linesLastMonth} lines total` : "last month"}
               icon={Calendar}
               color="text-blue-500"
             />
@@ -260,14 +261,14 @@ export default function StudentProfile() {
                   <Flame className="w-3.5 h-3.5 text-orange-500" />
                   <span className="text-[9px] font-extrabold uppercase tracking-widest text-muted-foreground">Pace</span>
                 </div>
-                <div className="text-xl font-display font-extrabold text-foreground tracking-tight">{projections.paceRecent}</div>
-                <div className="text-[10px] text-muted-foreground mt-0.5 font-medium">lines/week</div>
+                <div className="text-xl font-display font-extrabold text-foreground tracking-tight">{formatLines(projections.paceRecent, { short: true })}</div>
+                <div className="text-[10px] text-muted-foreground mt-0.5 font-medium">per week</div>
                 {projections.paceAllTime > 0 && (
                   <div className="text-[9px] text-muted-foreground mt-0.5">
                     <span className={`font-extrabold ${
                       projections.paceRecent > projections.paceAllTime ? "text-emerald-500" : projections.paceRecent < projections.paceAllTime ? "text-red-500" : "text-muted-foreground"
                     }`}>
-                      {projections.paceRecent > projections.paceAllTime ? "\u2191" : projections.paceRecent < projections.paceAllTime ? "\u2193" : "="} vs {projections.paceAllTime} avg
+                      {projections.paceRecent > projections.paceAllTime ? "\u2191" : projections.paceRecent < projections.paceAllTime ? "\u2193" : "="} vs {formatLines(projections.paceAllTime, { short: true })} avg
                     </span>
                   </div>
                 )}

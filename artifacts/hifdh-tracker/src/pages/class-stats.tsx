@@ -35,6 +35,7 @@ import {
   Check,
 } from "lucide-react";
 import { getGenderDotClass, type Gender } from "@/lib/gender-colors";
+import { formatLines } from "@/lib/format";
 
 /* ── Helpers ──────────────────────────────────────── */
 
@@ -168,19 +169,19 @@ export default function ClassStats() {
             color="text-emerald-500"
           />
           <StatCard
-            label="Lines Memorized"
+            label="Memorized"
             scope="All-time"
-            value={(stats?.totalLinesMemorized ?? 0).toLocaleString()}
-            sub="across the class"
+            value={formatLines(stats?.totalLinesMemorized ?? 0, { short: true })}
+            sub={`${(stats?.totalLinesMemorized ?? 0).toLocaleString()} lines · across the class`}
             icon={BookOpen}
             color="text-blue-500"
           />
           <StatCard
-            label="Lines / Week"
+            label="Pace / Week"
             scope="Last 4 weeks"
-            value={stats?.avgLinesPerWeek4Weeks ?? 0}
+            value={formatLines(stats?.avgLinesPerWeek4Weeks ?? 0, { short: true })}
             sub="per student"
-            secondary={{ value: stats?.avgLinesPerWeek ?? 0, label: "all-time" }}
+            secondary={{ value: formatLines(stats?.avgLinesPerWeek ?? 0, { short: true }), label: "all-time" }}
             icon={BarChart3}
             color="text-purple-500"
           />
@@ -677,23 +678,23 @@ export default function ClassStats() {
               <Calendar className="w-5 h-5 text-blue-500" /> Monthly Comparison
             </h2>
 
-            {/* Total lines row */}
+            {/* Total memorized row */}
             <div className="flex items-end gap-6 mb-4">
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">This Month</p>
-                <p className="text-4xl font-display font-bold text-foreground">{stats?.linesThisMonth ?? 0}</p>
-                <p className="text-sm text-muted-foreground">lines</p>
+                <p className="text-4xl font-display font-bold text-foreground">{formatLines(stats?.linesThisMonth ?? 0, { short: true })}</p>
+                <p className="text-sm text-muted-foreground">{(stats?.linesThisMonth ?? 0) >= 15 ? `${stats?.linesThisMonth ?? 0} lines` : "memorized"}</p>
               </div>
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Last Month</p>
-                <p className="text-4xl font-display font-bold text-muted-foreground">{stats?.linesLastMonth ?? 0}</p>
-                <p className="text-sm text-muted-foreground">lines</p>
+                <p className="text-4xl font-display font-bold text-muted-foreground">{formatLines(stats?.linesLastMonth ?? 0, { short: true })}</p>
+                <p className="text-sm text-muted-foreground">{(stats?.linesLastMonth ?? 0) >= 15 ? `${stats?.linesLastMonth ?? 0} lines` : "memorized"}</p>
               </div>
             </div>
             {((stats?.linesThisMonth ?? 0) > 0 || (stats?.linesLastMonth ?? 0) > 0) && (
               <div className={`flex items-center gap-1.5 text-sm font-bold ${monthUp ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                 {monthUp ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-                {monthUp ? "+" : ""}{monthDelta} lines
+                {monthUp ? "+" : ""}{formatLines(monthDelta)}
               </div>
             )}
 

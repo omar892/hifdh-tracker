@@ -5,6 +5,7 @@ import { Link, useLocation } from "wouter";
 import { format, startOfWeek, addDays, getDay } from "date-fns";
 import { CheckCircle2, Clock, BookOpen, Play, Pencil, AlertCircle } from "lucide-react";
 import { TOTAL_PAGES, getLinesForCompletedJuz, TOTAL_LINES } from "@/lib/quran-utils";
+import { formatLines } from "@/lib/format";
 import { getGenderAvatarClass, getGenderBorderClass, type Gender } from "@/lib/gender-colors";
 
 /** Mon-Wed = early (normal to be unlogged), Thu = mid, Fri+ = late (alarm). */
@@ -244,7 +245,7 @@ export default function Dashboard() {
                       </div>
                       {student.thisWeekDone && student.thisWeekEntry && (
                         <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold pt-0.5">
-                          {student.thisWeekEntry.memorizationLines} lines &middot; {student.thisWeekEntry.successfulDays}/{student.thisWeekEntry.daysAttended} days
+                          {formatLines(student.thisWeekEntry.memorizationLines)} &middot; {student.thisWeekEntry.successfulDays}/{student.thisWeekEntry.daysAttended} days
                         </p>
                       )}
                     </div>

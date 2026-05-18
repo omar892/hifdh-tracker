@@ -8,6 +8,30 @@ import { getCompletedJuz } from "./students";
 
 const router: IRouter = Router();
 
+/**
+ * Format a line count the way a teacher would say it. Mirrors the frontend
+ * util in hifdh-tracker/src/lib/format.ts. Kept inline to avoid leaking a
+ * frontend dep into the server bundle.
+ *   formatLines(6)   → "6 lines"
+ *   formatLines(20)  → "1 page 5 lines"
+ *   formatLines(110) → "7 pages 5 lines"
+ */
+function formatLines(n: number): string {
+  const LINES_PER_PAGE = 15;
+  const rounded = Math.round(n);
+  const sign = rounded < 0 ? "-" : "";
+  const abs = Math.abs(rounded);
+  if (abs < LINES_PER_PAGE) {
+    return `${sign}${abs} ${abs === 1 ? "line" : "lines"}`;
+  }
+  const pages = Math.floor(abs / LINES_PER_PAGE);
+  const lines = abs % LINES_PER_PAGE;
+  const pageWord = pages === 1 ? "page" : "pages";
+  if (lines === 0) return `${sign}${pages} ${pageWord}`;
+  const lineWord = lines === 1 ? "line" : "lines";
+  return `${sign}${pages} ${pageWord} ${lines} ${lineWord}`;
+}
+
 function getCurrentMonday(): string {
   const now = new Date();
   const day = now.getUTCDay();
@@ -366,7 +390,7 @@ function computeSpotlights(
         positives.push({
           studentId: student.id,
           name: student.name,
-          insightText: `+${delta} lines vs last week (${Math.round(pctChange * 100)}% increase)`,
+          insightText: `+${formatLines(delta)} vs last week (${Math.round(pctChange * 100)}% increase)`,
           type: "big_increase",
           category: "positive",
           priority: pctChange * 100,
@@ -397,7 +421,7 @@ function computeSpotlights(
         positives.push({
           studentId: student.id,
           name: student.name,
-          insightText: `New personal record: ${thisWeek.memorizationLines} lines in a week`,
+          insightText: `New personal record: ${formatLines(thisWeek.memorizationLines)} in a week`,
           type: "personal_record",
           category: "positive",
           priority: 85,
@@ -452,7 +476,7 @@ function computeSpotlights(
         concerns.push({
           studentId: student.id,
           name: student.name,
-          insightText: `-${delta} lines vs last week (${Math.round(pctDrop * 100)}% drop)`,
+          insightText: `-${formatLines(delta)} vs last week (${Math.round(pctDrop * 100)}% drop)`,
           type: "big_drop",
           category: "concern",
           priority: pctDrop * 100,

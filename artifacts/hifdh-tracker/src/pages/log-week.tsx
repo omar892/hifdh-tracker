@@ -34,6 +34,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { getGenderAvatarClass, getGenderDotClass, type Gender } from "@/lib/gender-colors";
+import { formatLines } from "@/lib/format";
 import { MushafPreviewPanel } from "@/components/quran/mushaf-preview-panel";
 
 /* ── Constants ────────────────────────────────────── */
@@ -1306,7 +1307,7 @@ export default function LogWeek() {
                           : "text-muted-foreground"
                       }`}
                     >
-                      {linesDelta > 0 ? "+" : ""}{linesDelta} {Math.abs(linesDelta) === 1 ? "line" : "lines"}
+                      {linesDelta > 0 ? "+" : ""}{formatLines(linesDelta)}
                     </span>
                     <span className="text-sm text-muted-foreground">·</span>
                     <span className="text-sm font-bold text-foreground">
