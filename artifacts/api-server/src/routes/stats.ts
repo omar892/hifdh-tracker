@@ -183,6 +183,29 @@ router.get("/students/:studentId/stats", requireAuth, async (req, res) => {
     if (inLastMonth) linesLastMonth += entry.memorizationLines;
   }
 
+  // Attendance summary — derived from the dailyAbsent arrays we already store
+  // on weekly_entries. Two windows: last 4 weeks (the "recent attention" view
+  // teachers act on) and all-time (the trust baseline). Each window counts
+  // present days vs scheduled days; absent days are the inverse of
+  // dailyAbsent. Skipped entries (no dailyAbsent JSON) contribute zero.
+  function attendanceFor(entries: typeof allEntries) {
+    let scheduled = 0;
+    let present = 0;
+    for (const e of entries) {
+      if (!e.dailyAbsent) continue;
+      try {
+        const absent = JSON.parse(e.dailyAbsent) as boolean[];
+        if (!Array.isArray(absent) || absent.length !== 5) continue;
+        scheduled += 5;
+        present += absent.filter((a) => !a).length;
+      } catch {}
+    }
+    const pct = scheduled > 0 ? Math.round((present / scheduled) * 100) : null;
+    return { scheduled, present, absent: scheduled - present, percent: pct };
+  }
+  const attendanceLast4Weeks = attendanceFor(last4WeekEntries);
+  const attendanceAllTime = attendanceFor(allEntries);
+
   res.json({
     totalLinesMemorized,
     totalQuranPercentage,
@@ -193,6 +216,11 @@ router.get("/students/:studentId/stats", requireAuth, async (req, res) => {
     weeksSinceLastEntry,
     linesThisMonth,
     linesLastMonth,
+    attendanceLast4Weeks,
+    attendanceAllTime,
+    status: student.status,
+    statusChangedAt: student.statusChangedAt,
+    archivedAt: student.archivedAt,
   });
 });
 

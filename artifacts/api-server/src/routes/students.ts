@@ -122,10 +122,22 @@ router.get("/students/:id", requireAuth, async (req, res) => {
   res.json(await studentWithJuz(student));
 });
 
+/**
+ * `status` is the new source of truth (active/paused/graduated/withdrawn).
+ * `active` is the one-release mirror — we keep them in sync so existing
+ * frontend reads of `active` don't break. When status changes, we also
+ * stamp status_changed_at and (for graduated/withdrawn) archived_at.
+ */
+const StatusBodySchema = z.enum(["active", "paused", "graduated", "withdrawn"]);
+
 router.patch("/students/:id", requireAuth, async (req, res) => {
   const teacher = req.teacher!;
   const { id } = UpdateStudentParams.parse(req.params);
   const body = UpdateStudentBody.parse(req.body);
+  // status is not yet in the OpenAPI schema (lib/api-spec), so parse it
+  // out of the raw body for now. Migration to typed body lands later.
+  const rawStatus = (req.body as { status?: unknown })?.status;
+  const status = rawStatus !== undefined ? StatusBodySchema.parse(rawStatus) : undefined;
   const updateData: Partial<{
     name: string;
     gender: string | null;
@@ -133,6 +145,9 @@ router.patch("/students/:id", requireAuth, async (req, res) => {
     currentLine: number;
     notes: string | null;
     active: boolean;
+    status: "active" | "paused" | "graduated" | "withdrawn";
+    statusChangedAt: Date;
+    archivedAt: Date | null;
     mushafPreference: string;
     defaultRmvAmount: string | null;
     defaultReviewAmount: string | null;
@@ -142,7 +157,24 @@ router.patch("/students/:id", requireAuth, async (req, res) => {
   if (body.currentPage !== undefined) updateData.currentPage = body.currentPage;
   if (body.currentLine !== undefined) updateData.currentLine = body.currentLine;
   if (body.notes !== undefined) updateData.notes = body.notes ?? null;
-  if (body.active !== undefined) updateData.active = body.active;
+  if (body.active !== undefined) {
+    updateData.active = body.active;
+    // Keep status in sync when callers still toggle the legacy bool.
+    updateData.status = body.active ? "active" : "withdrawn";
+    updateData.statusChangedAt = new Date();
+    if (!body.active) updateData.archivedAt = new Date();
+    else updateData.archivedAt = null;
+  }
+  if (status !== undefined) {
+    updateData.status = status;
+    updateData.statusChangedAt = new Date();
+    updateData.active = status === "active";
+    if (status === "graduated" || status === "withdrawn") {
+      updateData.archivedAt = new Date();
+    } else {
+      updateData.archivedAt = null;
+    }
+  }
   if (body.mushafPreference !== undefined) updateData.mushafPreference = body.mushafPreference;
   if (body.defaultRmvAmount !== undefined) updateData.defaultRmvAmount = body.defaultRmvAmount ?? null;
   if (body.defaultReviewAmount !== undefined) updateData.defaultReviewAmount = body.defaultReviewAmount ?? null;
