@@ -82,4 +82,34 @@ See `.env.example`. Required: `DATABASE_URL`, `PORT`, `VITE_PORT`, `BASE_PATH`. 
 
 ## Deployment
 
-Replit-targeted (`.replit` config present, `BASE_PATH` and pg session store wired for it). Production DB migrations are run by Replit on publish; local dev uses `drizzle-kit push` directly.
+**Host: Railway** (https://hifdh-tracker-production.up.railway.app). Auto-deploys from GitHub `main` push.
+
+- `railway.json` — build + start commands + `/api/health` healthcheck
+- `.nvmrc` + `packageManager` field — pin Node 24 + pnpm 10 (Nixpacks needs both signals)
+- Production = single process: `node artifacts/api-server/dist/index.cjs`. The api-server bundle serves both `/api/*` and the built frontend (`artifacts/hifdh-tracker/dist/public`) with an SPA fallback. See `app.ts`.
+- Postgres is a separate Railway service. App connects via `DATABASE_URL` (internal `postgres.railway.internal:5432`). For schema pushes from your laptop, use `DATABASE_PUBLIC_URL` (the external proxy at `crossover.proxy.rlwy.net:NNNNN`) — internal hostname isn't resolvable outside Railway's network.
+- `.replit` + `.replitignore` files remain in the repo but have no effect — leftover from the Replit host we migrated off. Safe to delete.
+
+### Common Railway ops
+
+```bash
+railway logs --deployment              # app stdout/stderr
+railway logs --build                   # latest build log
+railway redeploy --yes                 # force redeploy without code change
+railway variables                       # print env vars for the linked service
+railway service hifdh-tracker          # switch CLI to the app service
+railway service Postgres               # switch CLI to the DB service
+railway run -- pnpm ...                # run a local command with Railway env vars
+
+# Schema push from laptop (needs the public proxy URL):
+DATABASE_URL="$(railway service Postgres > /dev/null && railway variables --kv | grep DATABASE_PUBLIC_URL | cut -d= -f2-)" \
+  pnpm --filter @workspace/db run push-force
+
+# Re-seed demo data:
+DATABASE_URL="<public URL>" SEED_CONFIRM=yes \
+  pnpm --filter @workspace/scripts run seed-demo
+```
+
+### Connect-pg-simple is intentionally EXTERNAL in the api-server bundle
+
+It ships a `table.sql` loaded at runtime via `fs.readFile` (for `createTableIfMissing` in the session store). Bundling it into `dist/index.cjs` breaks that lookup — first session write fails with ENOENT and no authenticated request works. Keep it out of the `allowlist` in `artifacts/api-server/build.ts`.
