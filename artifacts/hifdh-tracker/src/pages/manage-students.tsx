@@ -16,6 +16,8 @@ interface StudentFormData {
   page: number;
   line: number;
   mushafPreference: MushafPreference;
+  defaultRmvAmount: string;
+  defaultReviewAmount: string;
   completedJuz: number[];
 }
 
@@ -94,12 +96,23 @@ function StudentForm({
   const [mushafPreference, setMushafPreference] = useState<MushafPreference>(
     initial?.mushafPreference ?? "madani_15",
   );
+  const [defaultRmvAmount, setDefaultRmvAmount] = useState<string>(initial?.defaultRmvAmount ?? "");
+  const [defaultReviewAmount, setDefaultReviewAmount] = useState<string>(initial?.defaultReviewAmount ?? "");
   const [completedJuz, setCompletedJuz] = useState<number[]>(initial?.completedJuz ?? []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onSave({ name: name.trim(), gender, page, line, mushafPreference, completedJuz });
+    onSave({
+      name: name.trim(),
+      gender,
+      page,
+      line,
+      mushafPreference,
+      defaultRmvAmount: defaultRmvAmount.trim(),
+      defaultReviewAmount: defaultReviewAmount.trim(),
+      completedJuz,
+    });
   };
 
   return (
@@ -166,6 +179,37 @@ function StudentForm({
               <div className="text-xs font-normal opacity-70 mt-0.5">{opt.subtitle}</div>
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Per-student RMV / Review default scopes. Shown as chips on the
+          log-week screen; teacher only needs to override per-week if it
+          changes. */}
+      <div>
+        <label className="block text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+          Default Scopes (per week)
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest mb-1">RMV</label>
+            <input
+              type="text"
+              value={defaultRmvAmount}
+              onChange={(e) => setDefaultRmvAmount(e.target.value)}
+              placeholder="e.g. last 5 pages"
+              className="w-full px-3 py-2 rounded-xl bg-background border-2 border-border text-sm focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest mb-1">Review</label>
+            <input
+              type="text"
+              value={defaultReviewAmount}
+              onChange={(e) => setDefaultReviewAmount(e.target.value)}
+              placeholder="e.g. 1 juz"
+              className="w-full px-3 py-2 rounded-xl bg-background border-2 border-border text-sm focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all"
+            />
+          </div>
         </div>
       </div>
 
@@ -287,6 +331,8 @@ export default function ManageStudents() {
         currentLine: data.line,
         startDate: new Date().toISOString().split("T")[0],
         mushafPreference: data.mushafPreference,
+        defaultRmvAmount: data.defaultRmvAmount || null,
+        defaultReviewAmount: data.defaultReviewAmount || null,
         completedJuz: data.completedJuz,
       },
     });
@@ -301,6 +347,8 @@ export default function ManageStudents() {
         currentPage: data.page,
         currentLine: data.line,
         mushafPreference: data.mushafPreference,
+        defaultRmvAmount: data.defaultRmvAmount || null,
+        defaultReviewAmount: data.defaultReviewAmount || null,
         completedJuz: data.completedJuz,
       },
     });
@@ -333,7 +381,16 @@ export default function ManageStudents() {
           <div className="p-4">
             <p className="text-sm font-bold text-muted-foreground mb-3 uppercase tracking-wider">Edit: {student.name}</p>
             <StudentForm
-              initial={{ name: student.name, gender: student.gender as Gender, page: student.currentPage, line: student.currentLine, mushafPreference: (student.mushafPreference ?? "madani_15") as MushafPreference, completedJuz: student.completedJuz ?? [] }}
+              initial={{
+                name: student.name,
+                gender: student.gender as Gender,
+                page: student.currentPage,
+                line: student.currentLine,
+                mushafPreference: (student.mushafPreference ?? "madani_15") as MushafPreference,
+                defaultRmvAmount: student.defaultRmvAmount ?? "",
+                defaultReviewAmount: student.defaultReviewAmount ?? "",
+                completedJuz: student.completedJuz ?? [],
+              }}
               onSave={(data) => handleUpdate(student.id, data)}
               onCancel={() => setEditingId(null)}
               isSaving={updateMutation.isPending}

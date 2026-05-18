@@ -25,5 +25,7 @@ export interface UpdateStudentRequest {
   notes?: string | null;
   active?: boolean;
   mushafPreference?: MushafPreference;
+  defaultRmvAmount?: string | null;
+  defaultReviewAmount?: string | null;
   completedJuz?: number[];
 }

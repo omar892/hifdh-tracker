@@ -18,6 +18,8 @@ const CreateStudentBodyCoerced = z.object({
   startDate: z.coerce.date(),
   notes: z.string().nullish(),
   mushafPreference: z.enum(["madani_15", "indopak_15"]).optional(),
+  defaultRmvAmount: z.string().nullish(),
+  defaultReviewAmount: z.string().nullish(),
   completedJuz: z.array(z.number().min(1).max(30)),
 });
 
@@ -67,6 +69,8 @@ router.post("/students", requireAuth, async (req, res) => {
     startDate: body.startDate.toISOString().split('T')[0],
     notes: body.notes ?? null,
     ...(body.mushafPreference ? { mushafPreference: body.mushafPreference } : {}),
+    defaultRmvAmount: body.defaultRmvAmount ?? null,
+    defaultReviewAmount: body.defaultReviewAmount ?? null,
   }).returning();
 
   if (body.completedJuz.length > 0) {
@@ -97,6 +101,8 @@ router.patch("/students/:id", requireAuth, async (req, res) => {
     notes: string | null;
     active: boolean;
     mushafPreference: string;
+    defaultRmvAmount: string | null;
+    defaultReviewAmount: string | null;
   }> = {};
   if (body.name !== undefined) updateData.name = body.name;
   if (body.gender !== undefined) updateData.gender = body.gender ?? null;
@@ -105,6 +111,8 @@ router.patch("/students/:id", requireAuth, async (req, res) => {
   if (body.notes !== undefined) updateData.notes = body.notes ?? null;
   if (body.active !== undefined) updateData.active = body.active;
   if (body.mushafPreference !== undefined) updateData.mushafPreference = body.mushafPreference;
+  if (body.defaultRmvAmount !== undefined) updateData.defaultRmvAmount = body.defaultRmvAmount ?? null;
+  if (body.defaultReviewAmount !== undefined) updateData.defaultReviewAmount = body.defaultReviewAmount ?? null;
 
   const hasUpdate = Object.keys(updateData).length > 0;
   let student;

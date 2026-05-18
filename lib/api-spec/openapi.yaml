@@ -447,6 +447,14 @@ components:
           type: boolean
         mushafPreference:
           $ref: "#/components/schemas/MushafPreference"
+        defaultRmvAmount:
+          type: string
+          nullable: true
+          description: Default RMV scope shown as a chip on log-week (e.g. "last 5 pages").
+        defaultReviewAmount:
+          type: string
+          nullable: true
+          description: Default Review scope shown as a chip on log-week (e.g. "1 juz").
         createdAt:
           type: string
         completedJuz:
@@ -479,6 +487,12 @@ components:
           nullable: true
         mushafPreference:
           $ref: "#/components/schemas/MushafPreference"
+        defaultRmvAmount:
+          type: string
+          nullable: true
+        defaultReviewAmount:
+          type: string
+          nullable: true
         completedJuz:
           type: array
           items:
@@ -510,6 +524,12 @@ components:
           type: boolean
         mushafPreference:
           $ref: "#/components/schemas/MushafPreference"
+        defaultRmvAmount:
+          type: string
+          nullable: true
+        defaultReviewAmount:
+          type: string
+          nullable: true
         completedJuz:
           type: array
           items:

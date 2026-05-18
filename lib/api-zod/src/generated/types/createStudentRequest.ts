@@ -24,5 +24,7 @@ export interface CreateStudentRequest {
   startDate: string;
   notes?: string | null;
   mushafPreference?: MushafPreference;
+  defaultRmvAmount?: string | null;
+  defaultReviewAmount?: string | null;
   completedJuz: number[];
 }

@@ -60,6 +60,18 @@ export const ListStudentsResponseItem = zod.object({
   notes: zod.string().nullish(),
   active: zod.boolean(),
   mushafPreference: zod.enum(["madani_15", "indopak_15"]),
+  defaultRmvAmount: zod
+    .string()
+    .nullish()
+    .describe(
+      'Default RMV scope shown as a chip on log-week (e.g. \"last 5 pages\").',
+    ),
+  defaultReviewAmount: zod
+    .string()
+    .nullish()
+    .describe(
+      'Default Review scope shown as a chip on log-week (e.g. \"1 juz\").',
+    ),
   createdAt: zod.string(),
   completedJuz: zod.array(zod.number()),
 });
@@ -80,6 +92,8 @@ export const CreateStudentBody = zod.object({
   startDate: zod.string(),
   notes: zod.string().nullish(),
   mushafPreference: zod.enum(["madani_15", "indopak_15"]).optional(),
+  defaultRmvAmount: zod.string().nullish(),
+  defaultReviewAmount: zod.string().nullish(),
   completedJuz: zod.array(zod.number()),
 });
 
@@ -104,6 +118,18 @@ export const GetStudentResponse = zod.object({
   notes: zod.string().nullish(),
   active: zod.boolean(),
   mushafPreference: zod.enum(["madani_15", "indopak_15"]),
+  defaultRmvAmount: zod
+    .string()
+    .nullish()
+    .describe(
+      'Default RMV scope shown as a chip on log-week (e.g. \"last 5 pages\").',
+    ),
+  defaultReviewAmount: zod
+    .string()
+    .nullish()
+    .describe(
+      'Default Review scope shown as a chip on log-week (e.g. \"1 juz\").',
+    ),
   createdAt: zod.string(),
   completedJuz: zod.array(zod.number()),
 });
@@ -136,6 +162,8 @@ export const UpdateStudentBody = zod.object({
   notes: zod.string().nullish(),
   active: zod.boolean().optional(),
   mushafPreference: zod.enum(["madani_15", "indopak_15"]).optional(),
+  defaultRmvAmount: zod.string().nullish(),
+  defaultReviewAmount: zod.string().nullish(),
   completedJuz: zod.array(zod.number()).optional(),
 });
 
@@ -153,6 +181,18 @@ export const UpdateStudentResponse = zod.object({
   notes: zod.string().nullish(),
   active: zod.boolean(),
   mushafPreference: zod.enum(["madani_15", "indopak_15"]),
+  defaultRmvAmount: zod
+    .string()
+    .nullish()
+    .describe(
+      'Default RMV scope shown as a chip on log-week (e.g. \"last 5 pages\").',
+    ),
+  defaultReviewAmount: zod
+    .string()
+    .nullish()
+    .describe(
+      'Default Review scope shown as a chip on log-week (e.g. \"1 juz\").',
+    ),
   createdAt: zod.string(),
   completedJuz: zod.array(zod.number()),
 });

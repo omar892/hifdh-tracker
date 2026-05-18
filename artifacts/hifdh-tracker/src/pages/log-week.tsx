@@ -128,6 +128,52 @@ function CategoryPill({ label, values, absent, expanded, onToggleExpand, onChang
   );
 }
 
+/* ── Scope chip ── RMV / Review scope shown as a small inline chip. The
+   default comes from the student profile; tapping toggles a tiny input
+   inline so the teacher can override per-week without a full text field
+   competing for attention. */
+
+interface ScopeChipProps {
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange: (next: string) => void;
+  aiBorder?: string;
+  aiFilled?: boolean;
+}
+
+function ScopeChip({ label, value, placeholder, onChange, aiBorder, aiFilled }: ScopeChipProps) {
+  const [editing, setEditing] = useState(false);
+  const displayValue = value || placeholder || "—";
+  return (
+    <div className={`inline-flex items-center gap-2 rounded-full border ${aiBorder ?? "border-border/50"} bg-card px-3 py-1.5 shadow-sm`}>
+      <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">{label}</span>
+      {editing ? (
+        <input
+          autoFocus
+          type="text"
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={() => setEditing(false)}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") setEditing(false); }}
+          className="bg-background border border-border rounded-md px-2 py-0.5 text-xs font-medium outline-none focus:border-primary min-w-[120px]"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="text-xs font-bold text-foreground hover:text-primary transition-colors flex items-center gap-1"
+        >
+          {displayValue}
+          <PenLine className="w-3 h-3 opacity-50" />
+        </button>
+      )}
+      {aiFilled && <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">AI</span>}
+    </div>
+  );
+}
+
 /* ── Day chip (legacy — used to be the daily grid before category pills) ─ */
 
 interface DayChipProps {
@@ -748,8 +794,10 @@ export default function LogWeek() {
       setDailyRmv(FULL_5());
       setDailyReview(FULL_5());
       setDailyAbsent(EMPTY_5());
-      setRmvAmount(lastEntry?.rmvAmount ?? "");
-      setReviewAmount(lastEntry?.reviewAmount ?? "");
+      // Scope fallback chain: last entry's scope (if any) → student default
+      // (set on profile) → empty.
+      setRmvAmount(lastEntry?.rmvAmount ?? student.defaultRmvAmount ?? "");
+      setReviewAmount(lastEntry?.reviewAmount ?? student.defaultReviewAmount ?? "");
       setWeekRating("steady");
       setNotes("");
     }
@@ -1268,36 +1316,26 @@ export default function LogWeek() {
           );
         })()}
 
-        {/* ── RMV & Review amounts ── */}
-        <div className="grid grid-cols-2 gap-2.5 mb-3">
-          <div className={`bg-card rounded-xl border border-border/50 px-3 py-2.5 shadow-sm ${aiBorderClass("rmvAmount")}`}>
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] font-extrabold text-primary uppercase tracking-wider">RMV (Daily)</span>
-              {isAiFilled("rmvAmount") && <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full ml-auto">AI</span>}
-            </div>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Recently memorized verses</p>
-            <input
-              type="text"
-              value={rmvAmount}
-              onChange={(e) => setRmvAmount(e.target.value)}
-              placeholder={suggestedRmv}
-              className="w-full mt-1.5 px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary transition-all font-medium"
-            />
-          </div>
-          <div className={`bg-card rounded-xl border border-border/50 px-3 py-2.5 shadow-sm ${aiBorderClass("reviewAmount")}`}>
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] font-extrabold text-primary uppercase tracking-wider">Review (Daily)</span>
-              {isAiFilled("reviewAmount") && <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full ml-auto">AI</span>}
-            </div>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Older material</p>
-            <input
-              type="text"
-              value={reviewAmount}
-              onChange={(e) => setReviewAmount(e.target.value)}
-              placeholder={suggestedReview}
-              className="w-full mt-1.5 px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary transition-all font-medium"
-            />
-          </div>
+        {/* ── Scope chips ── RMV / Review scope rarely changes week to
+              week. Defaults come from the student's profile; teacher only
+              taps to override per-week. */}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <ScopeChip
+            label="RMV"
+            value={rmvAmount}
+            placeholder={suggestedRmv}
+            onChange={setRmvAmount}
+            aiBorder={aiBorderClass("rmvAmount")}
+            aiFilled={isAiFilled("rmvAmount")}
+          />
+          <ScopeChip
+            label="Review"
+            value={reviewAmount}
+            placeholder={suggestedReview}
+            onChange={setReviewAmount}
+            aiBorder={aiBorderClass("reviewAmount")}
+            aiFilled={isAiFilled("reviewAmount")}
+          />
         </div>
 
         {/* ── 3 category pills ── Exception-based: each pill defaults to

@@ -16,6 +16,11 @@ export const studentsTable = pgTable("students", {
     .notNull()
     .default("madani_15")
     .references(() => mushafsTable.id),
+  // Per-student defaults for RMV/Review scope. RMV scope rarely changes
+  // week to week; setting it once on the profile lets log-week show it as
+  // a small chip instead of a full-width input.
+  defaultRmvAmount: text("default_rmv_amount"),
+  defaultReviewAmount: text("default_review_amount"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

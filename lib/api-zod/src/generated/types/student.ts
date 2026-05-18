@@ -26,6 +26,10 @@ export interface Student {
   notes?: string | null;
   active: boolean;
   mushafPreference: MushafPreference;
+  /** Default RMV scope shown as a chip on log-week (e.g. "last 5 pages"). */
+  defaultRmvAmount?: string | null;
+  /** Default Review scope shown as a chip on log-week (e.g. "1 juz"). */
+  defaultReviewAmount?: string | null;
   createdAt: string;
   completedJuz: number[];
 }
