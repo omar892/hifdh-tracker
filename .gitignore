@@ -48,6 +48,12 @@ Thumbs.db
 .cache/
 .local/
 
+# Per-user dev tooling (Claude Code, agent definitions, skill caches)
+.claude/
+.agents/
+skills/
+skills-lock.json
+
 # Environment variables
 .env
 .env.*
