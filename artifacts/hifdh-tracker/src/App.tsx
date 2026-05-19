@@ -10,6 +10,7 @@ import StudentProfile from "@/pages/student-profile";
 import ManageStudents from "@/pages/manage-students";
 import ClassStats from "@/pages/class-stats";
 import Settings from "@/pages/settings";
+import SharePage from "@/pages/share";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -24,6 +25,10 @@ const queryClient = new QueryClient({
 function Router() {
   return (
     <Switch>
+      {/* PUBLIC route — no auth, no app chrome. Lives outside everything
+          else so a parent with a link doesn't need to know the app exists. */}
+      <Route path="/share/:token" component={SharePage} />
+
       <Route path="/login" component={Login} />
       <Route path="/" component={Dashboard} />
       <Route path="/log-week" component={LogWeek} />
