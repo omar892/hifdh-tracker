@@ -172,34 +172,50 @@ export interface StudentRecordExtras {
   archivedAt?: string | null;
 }
 
-// ── Per-student dashboard signals (additive on /students/:id/stats) ────────
-// The student-profile redesign reads these alongside the existing fields. All
-// optional so any code that doesn't care about the new shape keeps compiling.
+// ── Per-student dashboard assessment (additive on /students/:id/stats) ─────
+// The student-profile redesign reads `assessment` — the single object the
+// server computes so the status banner and all three signal tiles can never
+// state conflicting characterizations of the same student. All optional so
+// any code that doesn't care about the new shape keeps compiling.
 
-export type StudentVerdictTier = "needs_attention" | "watch" | "on_track";
+export type StudentVerdictStatus = "needs_attention" | "watch" | "on_track";
 export type StudentTrendDir = "up" | "flat" | "down";
 
-export interface StudentVerdict {
-  tier: StudentVerdictTier;
-  sentence: string;
-  /** Internal flags that drove the tier (e.g. "stale_no_entry"). Diagnostic, not user-shown. */
-  signals: string[];
-  paceTrend: StudentTrendDir;
-  qualityTrend: StudentTrendDir;
-}
-
-export interface StudentTrajectory {
+export interface StudentTrajectorySignal {
+  /** Avg lines/week across the last `windowWeeks` weeks that have entries. */
+  linesPerWeek: number;
+  windowWeeks: number;
   /** Calendar-anchored, oldest → newest, lines per week (8 weeks, zero-filled). */
   sparkline: number[];
-  /** Avg lines/week across the last 4 weeks that have entries. */
-  linesPerWeek: number;
-  paceTrend: StudentTrendDir;
+  /** Pace is continuous — a real trend, shown with an arrow. */
+  trend: StudentTrendDir;
+  label: "Climbing" | "Steady" | "Slipping";
 }
 
-export interface StudentQualitySnapshot {
+export interface StudentQualitySignal {
   /** Newest → oldest of the last 4 rated weeks. */
   recentRatings: { weekStartDate: string; rating: string }[];
-  qualityTrend: StudentTrendDir;
+  /** Factual pattern (e.g. "Strong+ every week (last 4)") — no trend, no arrow. */
+  pattern: string;
+  latestRating: string | null;
+}
+
+export interface StudentAttendanceSignal {
+  percent: number | null;
+  present: number;
+  scheduled: number;
+  /** Real period-over-period trend (recent 4w vs prior 4w); null when no prior data. */
+  trend: StudentTrendDir | null;
+}
+
+export interface StudentAssessment {
+  status: StudentVerdictStatus;
+  sentence: string;
+  /** Internal flags that drove the status. Diagnostic, not user-shown. */
+  signals: string[];
+  trajectory: StudentTrajectorySignal;
+  quality: StudentQualitySignal;
+  attendance: StudentAttendanceSignal;
 }
 
 export interface StudentMonthlyComparison {
@@ -210,8 +226,6 @@ export interface StudentMonthlyComparison {
 }
 
 export interface StudentDashboardExtras {
-  verdict?: StudentVerdict;
-  trajectory?: StudentTrajectory;
-  quality?: StudentQualitySnapshot;
+  assessment?: StudentAssessment;
   monthlyComparison?: StudentMonthlyComparison;
 }

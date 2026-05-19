@@ -137,27 +137,29 @@ function getWeeksInMonth(yearMonth: string): Array<{ weekStartDate: string; week
   return weeks;
 }
 
-/* ── Per-student verdict tunables ─────────────────── */
-// All knobs in one place so a teacher's "feel" can be tuned without code
-// archaeology. Mirrored intentionally with class-level ATTENTION_THRESHOLDS —
-// the verdict reads off the SAME signal definitions as the class flagging.
+/* ── Per-student assessment tunables ──────────────
+   Every knob the verdict logic uses, in one place. A teacher tuning the
+   "feel" of the page edits here, not the algorithm. */
 const STUDENT_VERDICT_THRESHOLDS = {
-  // NEEDS ATTENTION: no entry for 1+ full weeks (i.e. they missed both this
-  // week and last week). 1 lets a teacher log a week late without alarm.
+  // NEEDS ATTENTION: no entry for more than this many full weeks.
   ATTENTION_NO_ENTRY_WEEKS: 1,
   // NEEDS ATTENTION: attendance % over the last 4 weeks below this floor.
   ATTENTION_ATTENDANCE_PCT: 60,
-  // NEEDS ATTENTION: rating dropped a full tier AND the new rating is one of
-  // the bottom two ("Needs Work" or "Difficult"). Just dropping a tier from
-  // Excellent → Strong is a Watch, not an alarm.
-  ATTENTION_RATING_FLOOR: 2, // 1 = difficult, 2 = needs_improvement
-  // WATCH: rating slipped a tier vs last week (any direction down).
-  // WATCH: pace trending down (last 4w avg lower than prior 4w by this %).
-  WATCH_PACE_DROP_PCT: 0.10,
-  // ±10% counts as "flat" for pace trend; outside → up/down.
-  PACE_TREND_BAND_PCT: 0.10,
-  // ±0.3 tier for quality trend (tiers are 1–5).
-  QUALITY_TREND_BAND_TIERS: 0.30,
+  // Pace trend: recent-4-week total vs prior-4-week total. Within ±this
+  // fraction counts as "flat" (Steady); outside → Climbing / Slipping.
+  PACE_TREND_BAND_PCT: 0.1,
+  // The rating "good zone" — Strong and Excellent. A one-tier move WITHIN
+  // this set (Strong↔Excellent) is normal oscillation and never flags.
+  RATING_GOOD_ZONE: ["strong", "excellent"] as readonly string[],
+  // WATCH: rating declined this many consecutive logged weeks (2 declines =
+  // 3 logged entries, each a lower tier than the one before it).
+  RATING_DECLINE_WEEKS: 2,
+  // NEEDS ATTENTION: rating sat in the lower zone (Steady / Needs Work /
+  // Difficult) for this many consecutive logged weeks — "dropped and stayed".
+  RATING_SUSTAINED_LOW_WEEKS: 2,
+  // Attendance trend: recent vs prior 4-week window. Within ±this many
+  // percentage points counts as "flat".
+  ATTENDANCE_TREND_BAND_PCT: 5,
 } as const;
 
 const RATING_TIERS_STUDENT: Record<string, number> = {
@@ -176,9 +178,9 @@ const RATING_LABELS_STUDENT: Record<string, string> = {
   difficult_week: "Difficult",
 };
 
-type StudentVerdictTier = "needs_attention" | "watch" | "on_track";
+type AssessmentTrend = "up" | "flat" | "down";
 
-function trendDirSimple(current: number, baseline: number, band: number): "up" | "flat" | "down" {
+function trendDirSimple(current: number, baseline: number, band: number): AssessmentTrend {
   if (baseline <= 0) {
     if (current > 0) return "up";
     return "flat";
@@ -187,19 +189,6 @@ function trendDirSimple(current: number, baseline: number, band: number): "up" |
   if (delta > band) return "up";
   if (delta < -band) return "down";
   return "flat";
-}
-
-function tierDirSimple(current: number, baseline: number, band: number): "up" | "flat" | "down" {
-  const delta = current - baseline;
-  if (delta > band) return "up";
-  if (delta < -band) return "down";
-  return "flat";
-}
-
-function prevMondayStr(monday: string): string {
-  const d = new Date(monday + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() - 7);
-  return d.toISOString().split("T")[0];
 }
 
 function mondaysEndingAt(thisWeekMonday: string, count: number): string[] {
@@ -211,6 +200,243 @@ function mondaysEndingAt(thisWeekMonday: string, count: number): string[] {
     out.push(d.toISOString().split("T")[0]);
   }
   return out;
+}
+
+/* ── Single source of truth: the student assessment ───────────────────────
+   ONE function decides the page-level status AND every signal tile's
+   characterization. The status banner and the trajectory / quality /
+   attendance tiles all read from the object this returns — nothing
+   recomputes a trend on its own. That is the fix for the page contradicting
+   itself (amber "rating slipped" banner over a "Quality: Climbing" tile). */
+
+const GOOD_ZONE_SET = new Set(STUDENT_VERDICT_THRESHOLDS.RATING_GOOD_ZONE);
+
+/**
+ * Quality is a 5-tier categorical rating — it naturally oscillates week to
+ * week, so a "Climbing/Slipping" trend on it is noise. Instead we state a
+ * FACT about the recent window: how many of the last N weeks landed
+ * Strong-or-above. No trend verb, no arrow.
+ */
+function describeQualityPattern(ratingsNewestFirst: string[]): string {
+  const n = ratingsNewestFirst.length;
+  if (n === 0) return "No ratings logged yet";
+  const excellentCount = ratingsNewestFirst.filter((r) => r === "excellent").length;
+  const goodCount = ratingsNewestFirst.filter((r) => GOOD_ZONE_SET.has(r)).length;
+  if (excellentCount === n) return `Excellent every week (last ${n})`;
+  if (goodCount === n) return `Strong+ every week (last ${n})`;
+  if (goodCount >= 1) return `${goodCount} of ${n} weeks Strong+`;
+  return `Below Strong all ${n} weeks`;
+}
+
+/**
+ * Decide whether the rating pattern is signal or noise.
+ *  - needs_attention: rating sat in the lower zone (Steady / Needs Work /
+ *    Difficult) for RATING_SUSTAINED_LOW_WEEKS consecutive logged weeks.
+ *  - watch: latest rating is in the lower zone, OR the rating declined for
+ *    RATING_DECLINE_WEEKS consecutive logged weeks.
+ *  - null: a one-tier move within the good zone (Strong↔Excellent) — noise.
+ */
+function classifyRatingSignal(ratingsNewestFirst: string[]): "needs_attention" | "watch" | null {
+  if (ratingsNewestFirst.length === 0) return null;
+  const inLower = (r: string) => !GOOD_ZONE_SET.has(r);
+
+  const sustain = STUDENT_VERDICT_THRESHOLDS.RATING_SUSTAINED_LOW_WEEKS;
+  if (
+    ratingsNewestFirst.length >= sustain &&
+    ratingsNewestFirst.slice(0, sustain).every(inLower)
+  ) {
+    return "needs_attention";
+  }
+
+  if (inLower(ratingsNewestFirst[0])) return "watch";
+
+  const need = STUDENT_VERDICT_THRESHOLDS.RATING_DECLINE_WEEKS + 1;
+  if (ratingsNewestFirst.length >= need) {
+    const tiers = ratingsNewestFirst.slice(0, need).map((r) => RATING_TIERS_STUDENT[r] ?? 3);
+    let declining = true;
+    for (let i = 0; i < need - 1; i++) {
+      if (!(tiers[i] < tiers[i + 1])) {
+        declining = false;
+        break;
+      }
+    }
+    if (declining) return "watch";
+  }
+  return null;
+}
+
+interface StudentAssessment {
+  status: "on_track" | "watch" | "needs_attention";
+  sentence: string;
+  /** Diagnostic flags that drove the status — not user-facing. */
+  signals: string[];
+  trajectory: {
+    /** Avg lines/week across the last `windowWeeks` weeks that have entries. */
+    linesPerWeek: number;
+    windowWeeks: number;
+    /** Calendar-anchored 8-week lines/week, oldest → newest, zero-filled. */
+    sparkline: number[];
+    /** Pace IS continuous — a real trend, safe to show with an arrow. */
+    trend: AssessmentTrend;
+    label: "Climbing" | "Steady" | "Slipping";
+  };
+  quality: {
+    /** Newest → oldest, last 4 rated weeks. */
+    recentRatings: { weekStartDate: string; rating: string }[];
+    /** Factual pattern string — no trend verb, no arrow. */
+    pattern: string;
+    latestRating: string | null;
+  };
+  attendance: {
+    percent: number | null;
+    present: number;
+    scheduled: number;
+    /** Real period-over-period (recent 4w vs prior 4w); null when no prior data. */
+    trend: AssessmentTrend | null;
+  };
+}
+
+function assessStudent(args: {
+  studentName: string;
+  entriesDesc: { weekStartDate: string; weekRating: string | null; memorizationLines: number }[];
+  weeksSinceLastEntry: number | null;
+  paceSparkline: number[];
+  last4WeekEntries: { memorizationLines: number }[];
+  attendanceRecent: { percent: number | null; present: number; scheduled: number };
+  attendancePrior: { percent: number | null };
+}): StudentAssessment {
+  const {
+    studentName,
+    entriesDesc,
+    weeksSinceLastEntry,
+    paceSparkline,
+    last4WeekEntries,
+    attendanceRecent,
+    attendancePrior,
+  } = args;
+  const name = studentName.split(" ")[0];
+  const T = STUDENT_VERDICT_THRESHOLDS;
+
+  // ── Trajectory — pace is continuous, so a trend arrow is honest here ──
+  const recentTotal4 = paceSparkline.slice(-4).reduce((s, n) => s + n, 0);
+  const priorTotal4 = paceSparkline.slice(0, 4).reduce((s, n) => s + n, 0);
+  const trajectoryTrend = trendDirSimple(recentTotal4, priorTotal4, T.PACE_TREND_BAND_PCT);
+  const linesPerWeek =
+    last4WeekEntries.length > 0
+      ? parseFloat(
+          (last4WeekEntries.reduce((s, e) => s + e.memorizationLines, 0) / last4WeekEntries.length).toFixed(1),
+        )
+      : 0;
+  const trajectoryLabel =
+    trajectoryTrend === "up" ? "Climbing" : trajectoryTrend === "down" ? "Slipping" : "Steady";
+
+  // ── Quality — categorical: a factual pattern, never a trend ──
+  const ratedDesc = entriesDesc.filter((e) => e.weekRating != null);
+  const recentRatings = ratedDesc
+    .slice(0, 4)
+    .map((e) => ({ weekStartDate: e.weekStartDate, rating: e.weekRating! }));
+  const qualityPattern = describeQualityPattern(recentRatings.map((r) => r.rating));
+  const latestRating = ratedDesc[0]?.weekRating ?? null;
+
+  // ── Attendance trend — real period-over-period (recent 4w vs prior 4w) ──
+  let attendanceTrend: AssessmentTrend | null = null;
+  if (attendanceRecent.percent != null && attendancePrior.percent != null) {
+    const delta = attendanceRecent.percent - attendancePrior.percent;
+    attendanceTrend =
+      delta > T.ATTENDANCE_TREND_BAND_PCT
+        ? "up"
+        : delta < -T.ATTENDANCE_TREND_BAND_PCT
+          ? "down"
+          : "flat";
+  }
+
+  // ── Status — the one decision. Every signal raises a rank; the highest
+  // rank wins. Computed once into `status` so nothing downstream can disagree. ──
+  const signals: string[] = [];
+  let statusRank = 0; // 0 = on_track, 1 = watch, 2 = needs_attention
+  const raise = (rank: number) => {
+    if (rank > statusRank) statusRank = rank;
+  };
+
+  const weeksStale = weeksSinceLastEntry ?? Number.POSITIVE_INFINITY;
+  const ratingSignal = classifyRatingSignal(recentRatings.map((r) => r.rating));
+
+  if (entriesDesc.length === 0) {
+    signals.push("no_entries_yet");
+  } else {
+    if (weeksStale > T.ATTENTION_NO_ENTRY_WEEKS) {
+      raise(2);
+      signals.push("stale_no_entry");
+    }
+    if (attendanceRecent.percent != null && attendanceRecent.percent < T.ATTENTION_ATTENDANCE_PCT) {
+      raise(2);
+      signals.push("low_attendance");
+    }
+    if (ratingSignal === "needs_attention") {
+      raise(2);
+      signals.push("rating_sustained_low");
+    } else if (ratingSignal === "watch") {
+      raise(1);
+      signals.push("rating_flag");
+    }
+    if (trajectoryTrend === "down") {
+      raise(1);
+      signals.push("pace_down");
+    }
+  }
+
+  const status: StudentAssessment["status"] =
+    statusRank >= 2 ? "needs_attention" : statusRank >= 1 ? "watch" : "on_track";
+
+  // ── Sentence — only ever rendered for watch / needs_attention (on_track
+  // shows no banner). It always describes the signal that escalated the
+  // status, so it cannot contradict the tiles. ──
+  const ratingLabel = RATING_LABELS_STUDENT[latestRating ?? ""] ?? "low";
+  let sentence: string;
+  if (entriesDesc.length === 0) {
+    sentence = `${name} hasn't logged any weeks yet — start with a first entry to set the baseline.`;
+  } else if (status === "needs_attention") {
+    if (signals.includes("stale_no_entry")) {
+      const w = weeksStale === Number.POSITIVE_INFINITY ? "several" : String(weeksStale);
+      sentence = `${name} hasn't logged in ${w} week${w === "1" ? "" : "s"} — reach out and reset the routine.`;
+    } else if (signals.includes("low_attendance")) {
+      sentence = `${name}'s attendance is ${attendanceRecent.percent}% over the last 4 weeks — check in on what's getting in the way.`;
+    } else if (signals.includes("rating_sustained_low")) {
+      sentence = `${name}'s rating has been ${ratingLabel} for ${T.RATING_SUSTAINED_LOW_WEEKS}+ weeks running — time for a focused conversation.`;
+    } else {
+      sentence = `${name} needs a check-in this week.`;
+    }
+  } else if (status === "watch") {
+    if (signals.includes("rating_flag") && signals.includes("pace_down")) {
+      sentence = `${name}'s rating and pace have both eased off — worth a quick check-in.`;
+    } else if (signals.includes("rating_flag")) {
+      sentence = `${name}'s recent rating dropped to ${ratingLabel} — keep an eye on this one.`;
+    } else {
+      sentence = `${name}'s pace is easing off — not a fire yet, just keep an eye on it.`;
+    }
+  } else {
+    sentence = `${name} is on track.`;
+  }
+
+  return {
+    status,
+    sentence,
+    signals,
+    trajectory: {
+      linesPerWeek,
+      windowWeeks: 4,
+      sparkline: paceSparkline,
+      trend: trajectoryTrend,
+      label: trajectoryLabel,
+    },
+    quality: { recentRatings, pattern: qualityPattern, latestRating },
+    attendance: {
+      percent: attendanceRecent.percent,
+      present: attendanceRecent.present,
+      scheduled: attendanceRecent.scheduled,
+      trend: attendanceTrend,
+    },
+  };
 }
 
 router.get("/students/:studentId/stats", requireAuth, async (req, res) => {
@@ -321,156 +547,36 @@ router.get("/students/:studentId/stats", requireAuth, async (req, res) => {
   const attendanceLast4Weeks = attendanceFor(last4WeekEntries);
   const attendanceAllTime = attendanceFor(allEntries);
 
-  /* ── Trajectory: 8-week lines/week sparkline + pace trend ──
-     Calendar-anchored (one slot per Monday, zero-filled for missed weeks) so
-     the chart shows the absence as well as the activity — that's the whole
-     story we're trying to tell. */
+  /* ── Trajectory sparkline: 8-week lines/week, calendar-anchored ──
+     One slot per Monday, zero-filled for missed weeks so the chart shows the
+     absences as well as the activity. */
   const eightWeekMondays = mondaysEndingAt(thisWeekMonday, 8);
   const entryByMonday = new Map<string, (typeof allEntries)[number]>();
   for (const e of allEntries) entryByMonday.set(e.weekStartDate, e);
-
   const paceSparkline = eightWeekMondays.map((m) => entryByMonday.get(m)?.memorizationLines ?? 0);
-  const recentTotal4 = paceSparkline.slice(-4).reduce((s, n) => s + n, 0);
-  const priorTotal4 = paceSparkline.slice(0, 4).reduce((s, n) => s + n, 0);
-  // Pace label uses entries-only avg over the last 4 weeks (matches what a
-  // teacher would call "her current pace" — skipped weeks aren't her pace).
-  const linesPerWeekRecent = last4WeekEntries.length > 0
-    ? parseFloat((last4WeekEntries.reduce((s, e) => s + e.memorizationLines, 0) / last4WeekEntries.length).toFixed(1))
-    : 0;
-  const paceTrend = trendDirSimple(recentTotal4, priorTotal4, STUDENT_VERDICT_THRESHOLDS.PACE_TREND_BAND_PCT);
 
-  /* ── Quality trend: avg tier last 4 vs prior 4 of RATED entries ── */
-  const rated = allEntries.filter((e) => e.weekRating != null);
-  const recent4Rated = rated.slice(0, 4);
-  const prior4Rated = rated.slice(4, 8);
-  const avgTier = (list: typeof rated) =>
-    list.length === 0
-      ? null
-      : list.reduce((s, e) => s + (RATING_TIERS_STUDENT[e.weekRating!] ?? 3), 0) / list.length;
-  const qRecent = avgTier(recent4Rated);
-  const qPrior = avgTier(prior4Rated);
-  const qualityTrend: "up" | "flat" | "down" =
-    qRecent == null || qPrior == null
-      ? "flat"
-      : tierDirSimple(qRecent, qPrior, STUDENT_VERDICT_THRESHOLDS.QUALITY_TREND_BAND_TIERS);
-  // Last-4-rated for the chip list under the quality tile (newest → oldest).
-  const recentRatings = recent4Rated.map((e) => ({
-    weekStartDate: e.weekStartDate,
-    rating: e.weekRating!,
-  }));
+  /* ── Prior-4-week attendance window, for the period-over-period trend ── */
+  const eightWeeksAgoMondayStudent = (() => {
+    const d = new Date(thisWeekMonday + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() - 8 * 7);
+    return d.toISOString().split("T")[0];
+  })();
+  const prior4WeekEntries = allEntries.filter(
+    (e) => e.weekStartDate >= eightWeeksAgoMondayStudent && e.weekStartDate < fourWeeksAgoMondayStudent,
+  );
+  const attendancePrior4Weeks = attendanceFor(prior4WeekEntries);
 
-  /* ── Verdict tier + sentence ──
-     The brief: NEEDS ATTENTION wins over WATCH wins over ON TRACK. Each tier
-     captures the strongest reason it landed there in `signal` for debugging /
-     potential UI use; the user-visible string is the sentence. */
-  const verdictSignals: string[] = [];
-  let verdictTier: StudentVerdictTier = "on_track";
-
-  const weeksStale = weeksSinceLastEntry ?? Number.POSITIVE_INFINITY;
-  const lastRated = rated[0]?.weekRating ?? null;
-  const lastTwoRatedTiers = rated.slice(0, 2).map((e) => RATING_TIERS_STUDENT[e.weekRating!] ?? 3);
-  const droppedAndStayed =
-    lastTwoRatedTiers.length === 2 &&
-    rated.length >= 3 &&
-    // current ≤ floor AND prior was at least one tier above
-    lastTwoRatedTiers[0] <= STUDENT_VERDICT_THRESHOLDS.ATTENTION_RATING_FLOOR &&
-    (RATING_TIERS_STUDENT[rated[2].weekRating!] ?? 3) - lastTwoRatedTiers[0] >= 1;
-
-  if (allEntries.length === 0) {
-    // Brand-new student. Treat as on_track-with-a-note so a fresh page doesn't
-    // open with a red alarm.
-    verdictTier = "on_track";
-    verdictSignals.push("no_entries_yet");
-  } else if (weeksStale > STUDENT_VERDICT_THRESHOLDS.ATTENTION_NO_ENTRY_WEEKS) {
-    verdictTier = "needs_attention";
-    verdictSignals.push("stale_no_entry");
-  } else if (
-    attendanceLast4Weeks.percent != null &&
-    attendanceLast4Weeks.percent < STUDENT_VERDICT_THRESHOLDS.ATTENTION_ATTENDANCE_PCT
-  ) {
-    verdictTier = "needs_attention";
-    verdictSignals.push("low_attendance");
-  } else if (droppedAndStayed) {
-    verdictTier = "needs_attention";
-    verdictSignals.push("rating_floor");
-  } else {
-    // Watch checks
-    const lastWeekMonday = prevMondayStr(thisWeekMonday);
-    const thisWeekEntry = allEntries.find((e) => e.weekStartDate === thisWeekMonday) ?? null;
-    const lastWeekEntry = allEntries.find((e) => e.weekStartDate === lastWeekMonday) ?? null;
-    if (thisWeekEntry?.weekRating && lastWeekEntry?.weekRating) {
-      const cur = RATING_TIERS_STUDENT[thisWeekEntry.weekRating] ?? 3;
-      const prev = RATING_TIERS_STUDENT[lastWeekEntry.weekRating] ?? 3;
-      if (prev - cur >= 1) {
-        verdictTier = "watch";
-        verdictSignals.push("rating_slip");
-      }
-    }
-    if (paceTrend === "down") {
-      if (verdictTier === "on_track") verdictTier = "watch";
-      verdictSignals.push("pace_down");
-    }
-  }
-
-  function composeStudentVerdictSentence(): string {
-    const name = student.name.split(" ")[0];
-    if (allEntries.length === 0) {
-      return `${name} hasn't logged any weeks yet — start with a first entry to set the baseline.`;
-    }
-    const streakClause =
-      currentStreakWeeks >= 2
-        ? `${currentStreakWeeks} weeks logged in a row`
-        : currentStreakWeeks === 1
-          ? "logging this week"
-          : null;
-
-    if (verdictTier === "needs_attention") {
-      if (verdictSignals.includes("stale_no_entry")) {
-        const wks = weeksStale;
-        return `${name} hasn't logged in ${wks} week${wks === 1 ? "" : "s"} — reach out and reset the routine.`;
-      }
-      if (verdictSignals.includes("low_attendance")) {
-        const pct = attendanceLast4Weeks.percent ?? 0;
-        return `${name}'s attendance is ${pct}% over the last 4 weeks — check in on what's getting in the way.`;
-      }
-      if (verdictSignals.includes("rating_floor")) {
-        const lab = RATING_LABELS_STUDENT[lastRated ?? ""] ?? "low";
-        return `${name}'s rating has dropped to ${lab} and stayed there — time for a focused conversation.`;
-      }
-      return `${name} needs a check-in this week.`;
-    }
-    if (verdictTier === "watch") {
-      if (verdictSignals.includes("rating_slip") && verdictSignals.includes("pace_down")) {
-        return `${name}'s rating slipped and pace is easing — worth a quick check-in.`;
-      }
-      if (verdictSignals.includes("rating_slip")) {
-        return `${name}'s rating slipped vs last week — keep an eye on this one.`;
-      }
-      if (verdictSignals.includes("pace_down")) {
-        return `${name}'s pace is trending down — not a fire yet, just watch it.`;
-      }
-      return `${name} is mostly steady but worth keeping an eye on.`;
-    }
-    // on_track
-    const paceClause =
-      paceTrend === "up"
-        ? "and pace is picking up"
-        : qualityTrend === "up"
-          ? "and quality is climbing"
-          : "and holding pace";
-    if (streakClause) {
-      return `${name} is on track — ${streakClause} ${paceClause}.`;
-    }
-    return `${name} is on track — ${paceClause}.`;
-  }
-
-  const verdict = {
-    tier: verdictTier,
-    sentence: composeStudentVerdictSentence(),
-    signals: verdictSignals,
-    paceTrend,
-    qualityTrend,
-  };
+  /* ── The single assessment — the status banner AND all three signal
+     tiles read from this one object, so the page cannot contradict itself. */
+  const assessment = assessStudent({
+    studentName: student.name,
+    entriesDesc: allEntries,
+    weeksSinceLastEntry,
+    paceSparkline,
+    last4WeekEntries,
+    attendanceRecent: attendanceLast4Weeks,
+    attendancePrior: attendancePrior4Weeks,
+  });
 
   res.json({
     totalLinesMemorized,
@@ -487,22 +593,11 @@ router.get("/students/:studentId/stats", requireAuth, async (req, res) => {
     status: student.status,
     statusChangedAt: student.statusChangedAt,
     archivedAt: student.archivedAt,
-    // Derived signals for the redesigned per-student dashboard. Additive —
-    // existing fields kept so log-week and any other consumers don't break.
-    verdict,
-    trajectory: {
-      // Calendar-anchored 8-week lines/week — zero-filled for missed weeks so
-      // the absences are visible.
-      sparkline: paceSparkline,
-      // What a teacher would call "her pace" — entries-only average.
-      linesPerWeek: linesPerWeekRecent,
-      paceTrend,
-    },
-    quality: {
-      // Newest → oldest rating chips for the last 4 RATED weeks.
-      recentRatings,
-      qualityTrend,
-    },
+    // Single source of truth for the per-student dashboard — status banner +
+    // trajectory / quality / attendance tiles all read from `assessment`.
+    // Additive; existing fields kept so log-week and other consumers don't
+    // break.
+    assessment,
     monthlyComparison: {
       // Per-week-normalized so a partial current month doesn't read as a cliff.
       thisMonthPerWeek: linesPerWeekThisMonth,

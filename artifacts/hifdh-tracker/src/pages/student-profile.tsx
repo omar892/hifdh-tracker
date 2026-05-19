@@ -56,11 +56,11 @@ import {
 } from "@/components/student-record/record-sections";
 import {
   type StudentStatus,
-  type AttendanceSummary,
   type StudentDashboardExtras,
-  type StudentVerdict,
-  type StudentTrajectory,
-  type StudentQualitySnapshot,
+  type StudentAssessment,
+  type StudentTrajectorySignal,
+  type StudentQualitySignal,
+  type StudentAttendanceSignal,
   type StudentMonthlyComparison,
 } from "@/hooks/use-student-record";
 import {
@@ -75,7 +75,7 @@ import {
   type TrendDir,
 } from "@/components/dashboard/shared";
 import { getGenderAvatarClass, type Gender } from "@/lib/gender-colors";
-import { formatLines, formatPagesDecimal } from "@/lib/format";
+import { formatLines } from "@/lib/format";
 
 /* ── Local constants / helpers ────────────────────── */
 
@@ -98,31 +98,27 @@ function isSameCalendarMonth(d: Date, today: Date): boolean {
 }
 
 // Three tiers, single palette. The class view uses concern/watch/fine —
-// we re-key those for the per-student verdict so the lookup matches the
-// verdict tier names coming back from the server.
-const VERDICT_TIER_TO_STATUS: Record<StudentVerdict["tier"], keyof typeof STATUS_META> = {
+// we re-key those for the per-student status so the lookup matches the
+// assessment status names coming back from the server.
+type VerdictStatus = StudentAssessment["status"];
+
+const VERDICT_TIER_TO_STATUS: Record<VerdictStatus, keyof typeof STATUS_META> = {
   needs_attention: "concern",
   watch: "watch",
   on_track: "fine",
 };
 
-const VERDICT_TIER_ICON: Record<StudentVerdict["tier"], React.ElementType> = {
+const VERDICT_TIER_ICON: Record<VerdictStatus, React.ElementType> = {
   needs_attention: AlertTriangle,
   watch: AlertCircle,
   on_track: CheckCircle2,
 };
 
-const VERDICT_TIER_LABEL: Record<StudentVerdict["tier"], string> = {
+const VERDICT_TIER_LABEL: Record<VerdictStatus, string> = {
   needs_attention: "NEEDS ATTENTION",
   watch: "WATCH",
   on_track: "ON TRACK",
 };
-
-function trajectoryLabel(trend: TrendDir): string {
-  if (trend === "up") return "Climbing";
-  if (trend === "down") return "Slipping";
-  return "Steady";
-}
 
 /* ── Section 0: Header ────────────────────────────── */
 
@@ -245,57 +241,54 @@ function StudentHeader({
 
 /* ── Section 1: Verdict ───────────────────────────── */
 
-function VerdictHero({
-  verdict,
-  trajectory,
-  quality,
-  attendance,
-}: {
-  verdict: StudentVerdict;
-  trajectory?: StudentTrajectory;
-  quality?: StudentQualitySnapshot;
-  attendance?: AttendanceSummary;
-}) {
-  const statusKey = VERDICT_TIER_TO_STATUS[verdict.tier];
-  const meta = STATUS_META[statusKey];
-  const Icon = VERDICT_TIER_ICON[verdict.tier];
+/**
+ * The status banner AND the three tiles below all read from one `assessment`
+ * object computed server-side — nothing recomputes a trend on its own, so the
+ * page can't contradict itself. When status is on_track the banner is omitted
+ * entirely; the tiles still show the present-state read.
+ */
+function VerdictHero({ assessment }: { assessment: StudentAssessment }) {
+  const showBanner = assessment.status !== "on_track";
+  const meta = STATUS_META[VERDICT_TIER_TO_STATUS[assessment.status]];
+  const Icon = VERDICT_TIER_ICON[assessment.status];
 
   return (
     <section className="mb-8">
-      <div className={`rounded-3xl border ${meta.border} ${meta.bg} p-6`}>
-        <div className="flex items-start gap-3 mb-2">
-          <div
-            className={`shrink-0 w-10 h-10 rounded-full bg-card flex items-center justify-center ${meta.icon}`}
-          >
-            <Icon className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <span
-              className={`inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full ${meta.chipBg} ${meta.chipText}`}
+      {showBanner && (
+        <div className={`rounded-3xl border ${meta.border} ${meta.bg} p-6`}>
+          <div className="flex items-start gap-3 mb-2">
+            <div
+              className={`shrink-0 w-10 h-10 rounded-full bg-card flex items-center justify-center ${meta.icon}`}
             >
-              {VERDICT_TIER_LABEL[verdict.tier]}
-            </span>
-            <p className="mt-2 text-lg md:text-xl text-foreground font-display font-bold leading-snug">
-              {verdict.sentence}
-            </p>
+              <Icon className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span
+                className={`inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full ${meta.chipBg} ${meta.chipText}`}
+              >
+                {VERDICT_TIER_LABEL[assessment.status]}
+              </span>
+              <p className="mt-2 text-lg md:text-xl text-foreground font-display font-bold leading-snug">
+                {assessment.sentence}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Three signal tiles. These derive from the same data as the verdict
-          so they can never contradict it. */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-        <TrajectoryTile trajectory={trajectory} />
-        <QualityTile quality={quality} />
-        <AttendanceTile attendance={attendance} />
+      {/* Three signal tiles — all read from `assessment`, never recomputed. */}
+      <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${showBanner ? "mt-4" : ""}`}>
+        <TrajectoryTile trajectory={assessment.trajectory} />
+        <QualityTile quality={assessment.quality} />
+        <AttendanceTile attendance={assessment.attendance} />
       </div>
     </section>
   );
 }
 
-function TrajectoryTile({ trajectory }: { trajectory?: StudentTrajectory }) {
-  const trend: TrendDir = trajectory?.paceTrend ?? null;
-  const lines = trajectory?.linesPerWeek ?? 0;
+function TrajectoryTile({ trajectory }: { trajectory: StudentTrajectorySignal }) {
+  // Pace is a continuous metric — a trend arrow is honest here.
+  const trend: TrendDir = trajectory.trend;
   const sparkColor =
     trend === "down"
       ? "hsl(346, 84%, 56%)" // rose-500-ish for slipping
@@ -306,20 +299,21 @@ function TrajectoryTile({ trajectory }: { trajectory?: StudentTrajectory }) {
     <StatTile
       icon={BarChart3}
       label="Trajectory"
-      value={formatLines(lines, { short: true })}
-      unit="/ week"
+      value={formatLines(trajectory.linesPerWeek, { short: true })}
+      unit={`/wk · ${trajectory.windowWeeks}-wk avg`}
       trendDirection={trend}
-      deltaText={trajectoryLabel(trend)}
-      deltaCaption="last 8 weeks"
+      deltaText={trajectory.label}
+      deltaCaption="8-week trend"
     >
-      <MiniSparkline values={trajectory?.sparkline ?? []} color={sparkColor} className="mt-4 -mx-1" />
+      <MiniSparkline values={trajectory.sparkline} color={sparkColor} className="mt-4 -mx-1" />
     </StatTile>
   );
 }
 
-function QualityTile({ quality }: { quality?: StudentQualitySnapshot }) {
-  const recent = quality?.recentRatings ?? [];
-  const trend: TrendDir = quality?.qualityTrend ?? null;
+function QualityTile({ quality }: { quality: StudentQualitySignal }) {
+  // Quality is a categorical rating — no trend arrow, no "Climbing" verb.
+  // The delta line states a FACT about the recent window instead.
+  const recent = quality.recentRatings;
   const latest = recent[0];
   return (
     <StatTile
@@ -336,9 +330,7 @@ function QualityTile({ quality }: { quality?: StudentQualitySnapshot }) {
         )
       }
       unit={latest ? "latest" : "no ratings yet"}
-      trendDirection={trend}
-      deltaText={trend === "up" ? "Climbing" : trend === "down" ? "Slipping" : "Holding"}
-      deltaCaption="last 4 rated"
+      deltaText={quality.pattern}
     >
       {recent.length > 0 ? (
         <div className="mt-4 flex flex-wrap gap-1.5">
@@ -348,25 +340,24 @@ function QualityTile({ quality }: { quality?: StudentQualitySnapshot }) {
         </div>
       ) : (
         <p className="mt-4 text-xs text-muted-foreground italic">
-          Log a few weeks with ratings to see the trend.
+          Log a few weeks with ratings to see the pattern.
         </p>
       )}
     </StatTile>
   );
 }
 
-function AttendanceTile({ attendance }: { attendance?: AttendanceSummary }) {
-  const pct = attendance?.percent ?? null;
-  const present = attendance?.present ?? 0;
-  const scheduled = attendance?.scheduled ?? 0;
-  const tone: TrendDir = pct == null ? null : pct >= 80 ? "up" : pct >= 60 ? "flat" : "down";
-  const barColor = pct == null
-    ? "bg-muted"
-    : pct >= 80
-      ? "bg-emerald-500"
-      : pct >= 60
-        ? "bg-amber-500"
-        : "bg-rose-500";
+function AttendanceTile({ attendance }: { attendance: StudentAttendanceSignal }) {
+  const pct = attendance.percent;
+  const { present, scheduled, trend } = attendance;
+  const barColor =
+    pct == null
+      ? "bg-muted"
+      : pct >= 80
+        ? "bg-emerald-500"
+        : pct >= 60
+          ? "bg-amber-500"
+          : "bg-rose-500";
   return (
     <StatTile
       icon={UsersIcon}
@@ -374,7 +365,7 @@ function AttendanceTile({ attendance }: { attendance?: AttendanceSummary }) {
       label="Attendance"
       value={pct == null ? "—" : `${pct}%`}
       unit="last 4 weeks"
-      trendDirection={tone}
+      trendDirection={trend}
       deltaText={scheduled > 0 ? `${present} of ${scheduled}` : "—"}
       deltaCaption={scheduled > 0 ? "days present" : ""}
     >
@@ -390,6 +381,7 @@ function AttendanceTile({ attendance }: { attendance?: AttendanceSummary }) {
 function FinishTimeline({
   juzCompleted,
   projections,
+  paceTrend,
 }: {
   juzCompleted: number;
   projections:
@@ -404,18 +396,16 @@ function FinishTimeline({
         trend: "improving" | "declining" | "stable";
       }
     | undefined;
+  /** Pace stability badge reads the SAME trend as the Trajectory tile, so the
+      two characterizations of pace can never disagree. */
+  paceTrend: TrendDir;
 }) {
   const hasProjection = projections && projections.paceRecent > 0;
-  const trendDir: TrendDir =
-    projections?.trend === "improving"
-      ? "up"
-      : projections?.trend === "declining"
-        ? "down"
-        : "flat";
+  const trendDir: TrendDir = paceTrend;
   const stabilityLabel =
-    projections?.trend === "improving"
+    paceTrend === "up"
       ? "Pace improving"
-      : projections?.trend === "declining"
+      : paceTrend === "down"
         ? "Pace easing"
         : "Pace stable";
 
@@ -458,8 +448,8 @@ function FinishTimeline({
               tone="now"
               label="Now"
               primary={`Juz ${juzCompleted}`}
-              secondary={`${formatPagesDecimal(projections.paceRecent)}/wk`}
-              caption="current pace"
+              secondary={`${formatLines(projections.paceRecent, { short: true })}/wk`}
+              caption="8-week avg pace"
             />
             <TimelineStep
               tone="mid"
@@ -725,7 +715,7 @@ function RecordTable({
         <span>Week</span>
         <span>Rating</span>
         <span>Days</span>
-        <span>Lines</span>
+        <span>Memorized</span>
         <span aria-hidden />
       </div>
       <ul className="divide-y divide-border/30">
@@ -899,14 +889,11 @@ export default function StudentProfile() {
     month: monthStr,
   });
 
-  // The stats endpoint returns the legacy fields plus our new dashboard extras.
-  // We narrow once here so the rest of the page stays typed.
+  // The stats endpoint returns the legacy fields plus our new dashboard extras
+  // (the single `assessment` object). We narrow once here so the rest of the
+  // page stays typed.
   const stats = rawStats as
-    | (typeof rawStats & StudentDashboardExtras & {
-        attendanceLast4Weeks?: AttendanceSummary;
-        attendanceAllTime?: AttendanceSummary;
-        status?: StudentStatus;
-      })
+    | (typeof rawStats & StudentDashboardExtras & { status?: StudentStatus })
     | undefined;
 
   const editWeek = useMemo(
@@ -966,16 +953,18 @@ export default function StudentProfile() {
     );
   }
 
-  // The verdict block is the load-bearing piece of the page; if the server
-  // didn't return it (older API, transient failure), fall back to an
-  // on-track-with-info reading so the page still renders something coherent.
-  const verdict: StudentVerdict =
-    stats?.verdict ?? {
-      tier: "on_track",
+  // The assessment is the load-bearing piece of the page — the status banner
+  // AND all three signal tiles read from it. If the server didn't return it
+  // (older API, transient failure), fall back to an on-track reading (no
+  // banner) so the page still renders something coherent.
+  const assessment: StudentAssessment =
+    stats?.assessment ?? {
+      status: "on_track",
       sentence: `Showing baseline data for ${student.name}.`,
       signals: ["fallback"],
-      paceTrend: "flat",
-      qualityTrend: "flat",
+      trajectory: { linesPerWeek: 0, windowWeeks: 4, sparkline: [], trend: "flat", label: "Steady" },
+      quality: { recentRatings: [], pattern: "No ratings logged yet", latestRating: null },
+      attendance: { percent: null, present: 0, scheduled: 0, trend: null },
     };
 
   return (
@@ -996,16 +985,12 @@ export default function StudentProfile() {
           onBack={() => setLocation("/")}
         />
 
-        <VerdictHero
-          verdict={verdict}
-          trajectory={stats?.trajectory}
-          quality={stats?.quality}
-          attendance={stats?.attendanceLast4Weeks}
-        />
+        <VerdictHero assessment={assessment} />
 
         <FinishTimeline
           juzCompleted={stats?.juzCompleted ?? 0}
           projections={projections}
+          paceTrend={assessment.trajectory.trend}
         />
 
         <RecordSection
