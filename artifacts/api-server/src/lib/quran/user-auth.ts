@@ -33,7 +33,17 @@ const accessCache = new Map<number, CachedAccessToken>();
 const inflight = new Map<number, Promise<string>>();
 
 export function getUserEnvConfig(): UserEnvConfig {
-  const env = (process.env.QURAN_ENV ?? "prelive").toLowerCase();
+  // QF_USER_ENV overrides QURAN_ENV for the User API only, because the
+  // Production QF client typically ships with "NO authentication/user
+  // features by default" while the Pre-Production (Test) client has them
+  // enabled. This lets the Content API stay in production while the User
+  // API integration points at prelive, until production user features
+  // are granted.
+  const env = (
+    process.env.QF_USER_ENV ??
+    process.env.QURAN_ENV ??
+    "prelive"
+  ).toLowerCase();
   if (env === "production") {
     return {
       authBaseUrl: "https://oauth2.quran.foundation",
