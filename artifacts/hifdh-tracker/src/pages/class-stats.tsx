@@ -1,43 +1,43 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useProtectedRoute } from "@/hooks/use-auth";
-import { useGetClassStats, useGetDashboard } from "@workspace/api-client-react";
+import {
+  useGetClassStats,
+  useGetCurrentClass,
+} from "@workspace/api-client-react";
+import type { ClassStats as ClassStatsData, RosterRow } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  Cell,
-} from "recharts";
-import {
-  Award,
-  Users,
-  TrendingUp,
-  BookOpen,
   AlertTriangle,
-  BarChart3,
   CheckCircle2,
-  Clock,
-  Snowflake,
-  ArrowUpRight,
-  ArrowDownRight,
-  Calendar,
-  ClipboardCheck,
-  ChevronDown,
+  Award,
+  BookOpen,
+  CalendarDays,
+  Users,
+  BarChart3,
+  Flame,
   Sparkles,
-  AlertCircle,
-  Check,
+  TrendingUp,
+  ChevronDown,
+  ArrowUpDown,
 } from "lucide-react";
 import { getGenderDotClass, type Gender } from "@/lib/gender-colors";
 import { formatLines } from "@/lib/format";
+import {
+  RATING_META,
+  RATING_ORDER,
+  STATUS_META,
+  TrendArrow,
+  SectionHeader,
+  MiniSparkline,
+  RatingChip,
+  StatTile,
+  JuzProgressBar,
+  formatWeekRange,
+  type TrendDir,
+} from "@/components/dashboard/shared";
 
-/* ── Helpers ──────────────────────────────────────── */
+/* ── Small helpers ───────────────────────────────── */
 
 function StudentLink({ id, children, className = "" }: { id: number; children: React.ReactNode; className?: string }) {
   return (
@@ -50,902 +50,586 @@ function StudentLink({ id, children, className = "" }: { id: number; children: R
   );
 }
 
-// framer-motion entrance animations were not completing reliably in our
-// preview environment, leaving sections stuck at opacity:0. Decorative
-// fade-in removed; sections render in their final state immediately.
-function Section({ children }: { children: React.ReactNode; delay?: number }) {
-  return <div>{children}</div>;
+/* ── Section 1: Header + Verdict ─────────────────── */
+
+function HeaderVerdict({
+  className,
+  weekRange,
+  sentence,
+}: {
+  className: string;
+  weekRange: { weekStartDate: string; weekEndDate: string };
+  sentence: string;
+}) {
+  // Split on the first em-dash so we can emphasize the "X students need a
+  // check-in" clause that follows. The server composes the sentence with this
+  // shape on purpose.
+  const dashIdx = sentence.indexOf(" — ");
+  const lede = dashIdx >= 0 ? sentence.slice(0, dashIdx) : sentence;
+  const rest = dashIdx >= 0 ? sentence.slice(dashIdx + 3) : "";
+  return (
+    <header className="mb-6">
+      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary flex items-center gap-2">
+        <CalendarDays className="w-3 h-3" />
+        Week of {formatWeekRange(weekRange.weekStartDate, weekRange.weekEndDate)}
+      </p>
+      <h1 className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">
+        {className}
+      </h1>
+      <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">
+        {lede}
+        {rest && (
+          <>
+            {" — "}
+            <span className="font-semibold text-foreground/90">{rest}</span>
+          </>
+        )}
+      </p>
+    </header>
+  );
 }
 
-function StatCard({
-  label,
-  scope,
-  value,
-  sub,
-  secondary,
-  icon: Icon,
-  color = "text-primary",
+/* ── Section 2: Needs Attention (HERO) ───────────── */
+
+function AttentionCard({
+  item,
 }: {
-  label: string;
-  /** Time window the headline value covers — e.g. "Last 4 weeks", "All-time" */
-  scope?: string;
-  value: string | number;
-  sub?: string;
-  /** Optional smaller value below for the alternate time window */
-  secondary?: { label: string; value: string | number };
-  icon: React.ElementType;
-  color?: string;
+  item: ClassStatsData["attention"]["concern"][number];
 }) {
+  const meta = item.tier === "concern" ? STATUS_META.concern : STATUS_META.watch;
   return (
-    <div className="bg-card rounded-2xl p-6 border border-border/50 shadow-sm">
-      <div className="flex items-center gap-2 mb-3">
-        <Icon className={`w-5 h-5 ${color}`} />
-        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
+    <StudentLink id={item.studentId} className="block">
+      <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card p-3.5 transition-colors hover:bg-secondary/30">
+        <div className={`absolute left-0 top-0 h-full w-1 ${meta.dot}`} />
+        <div className="pl-1.5">
+          <p className="text-[13px] font-bold text-foreground">{item.name}</p>
+          <p className="mt-1 text-[12.5px] font-medium leading-snug text-foreground/80">{item.reason}</p>
+          <p className="mt-2 text-[12px] leading-snug text-muted-foreground">{item.action}</p>
+        </div>
       </div>
-      <div className="text-4xl font-display font-bold text-foreground">{value}</div>
-      {scope && <div className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider mt-0.5">{scope}</div>}
-      {sub && <div className="text-sm text-muted-foreground mt-1">{sub}</div>}
-      {secondary && (
-        <div className="text-xs text-muted-foreground/70 mt-2 pt-2 border-t border-border/30">
-          <span className="font-bold text-foreground/70">{secondary.value}</span>{" "}
-          <span>{secondary.label}</span>
+    </StudentLink>
+  );
+}
+
+function NeedsAttention({ attention }: { attention: ClassStatsData["attention"] }) {
+  const items = [...attention.concern, ...attention.watch];
+  return (
+    <section className="mb-7">
+      <SectionHeader title="Needs your attention" icon={AlertTriangle} iconColor="text-rose-500" hint="act on these first" />
+      {items.length === 0 ? (
+        <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-500/5 p-4 flex items-start gap-3">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[13px] font-bold text-foreground">All clear this week.</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">No students are flagged for a check-in right now.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((item) => (
+            <AttentionCard key={item.studentId} item={item} />
+          ))}
         </div>
       )}
+
+      {attention.borderline.length > 0 && (
+        <p className="mt-2.5 text-[12px] text-muted-foreground">
+          <span className="font-semibold text-foreground/80">Also keep an eye on:</span>{" "}
+          {attention.borderline.map((b, i) => (
+            <span key={b.studentId}>
+              {i > 0 && ", "}
+              <StudentLink id={b.studentId} className="font-medium text-foreground/80">
+                {b.name}
+              </StudentLink>
+              <span className="text-muted-foreground"> ({b.hint})</span>
+            </span>
+          ))}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/* ── Section 3: Class Pulse ──────────────────────── */
+
+function PaceCard({ pace }: { pace: ClassStatsData["classPulse"]["pace"] }) {
+  const deltaDir: TrendDir = pace.delta > 0.5 ? "up" : pace.delta < -0.5 ? "down" : "flat";
+  const peak = Math.max(...pace.sparkline, 0);
+  return (
+    <StatTile
+      icon={BarChart3}
+      label="Weekly pace"
+      value={formatLines(pace.thisWeek, { short: true })}
+      unit="/ student"
+      trendDirection={deltaDir}
+      deltaText={`${pace.delta > 0 ? "+" : ""}${formatLines(pace.delta, { short: true })}`}
+      deltaCaption="vs 4-week avg"
+    >
+      <MiniSparkline values={pace.sparkline} className="mt-2 -mx-1" height={42} />
+      <p className="text-[10px] text-muted-foreground/80 mt-0.5 font-medium">
+        Last 8 weeks{peak > 0 ? ` · peak ${formatLines(peak, { short: true })}` : ""}
+      </p>
+    </StatTile>
+  );
+}
+
+function QualityCard({ quality }: { quality: ClassStatsData["classPulse"]["quality"] }) {
+  const total = quality.totalRated;
+  const deltaDir: TrendDir =
+    quality.deltaStrongOrAbove > 0 ? "up" : quality.deltaStrongOrAbove < 0 ? "down" : "flat";
+  return (
+    <StatTile
+      icon={Sparkles}
+      iconColor="text-yellow-500"
+      label="Recitation quality"
+      value={quality.strongOrAbove}
+      unit={total > 0 ? `of ${total} at Strong+` : "at Strong+"}
+      trendDirection={deltaDir}
+      deltaText={`${quality.deltaStrongOrAbove > 0 ? "+" : ""}${quality.deltaStrongOrAbove}`}
+      deltaCaption="vs last week"
+    >
+      {total > 0 ? (
+        <>
+          <div className="mt-2.5 h-2.5 rounded-full overflow-hidden flex bg-secondary">
+            {RATING_ORDER.map((key) => {
+              const count = quality.mix[key];
+              if (count === 0) return null;
+              const pct = (count / total) * 100;
+              return (
+                <div
+                  key={key}
+                  className={`${RATING_META[key].bar} h-full`}
+                  style={{ width: `${pct}%` }}
+                  title={`${RATING_META[key].label}: ${count}`}
+                />
+              );
+            })}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-2.5 gap-y-1 text-[10.5px]">
+            {RATING_ORDER.map((key) =>
+              quality.mix[key] > 0 ? (
+                <span key={key} className="flex items-center gap-1 text-muted-foreground">
+                  <span className={`w-1.5 h-1.5 rounded-full ${RATING_META[key].bar}`} />
+                  <span className="font-semibold text-foreground/80">{quality.mix[key]}</span>
+                  {RATING_META[key].label}
+                </span>
+              ) : null,
+            )}
+          </div>
+        </>
+      ) : (
+        <p className="mt-3 text-[12px] text-muted-foreground italic">No rated entries yet this week.</p>
+      )}
+    </StatTile>
+  );
+}
+
+function AttendanceCard({
+  attendance,
+  pendingNames,
+  perStudentDays,
+}: {
+  attendance: ClassStatsData["classPulse"]["attendance"];
+  pendingNames: string[];
+  perStudentDays: (number | null | undefined)[];
+}) {
+  const pct = attendance.percentThisWeek;
+  // Map each student to a dot color based on this week's daysAttended:
+  // 4+ → emerald (good), 1-3 → amber (partial), 0/null → rose (absent or no entry yet).
+  const dotColor = (days: number | null | undefined): string => {
+    if (days == null || days === 0) return "bg-rose-400";
+    if (days >= 4) return "bg-emerald-500";
+    return "bg-amber-500";
+  };
+  return (
+    <StatTile
+      icon={Users}
+      iconColor="text-blue-500"
+      label="Showing up"
+      value={pct == null ? "—" : `${pct}%`}
+      unit="attendance"
+    >
+      <p className="mt-0.5 text-[12px] text-muted-foreground">
+        avg <span className="font-semibold text-foreground">{attendance.avgDaysOfFive.toFixed(1)}</span> of 5 days
+      </p>
+      {/* Per-student dot grid — one dot per active student. Communicates the
+          "9 of 10 logged" stat as a glance, including which students are still
+          pending (rose dots). */}
+      {perStudentDays.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1">
+          {perStudentDays.map((days, i) => (
+            <span
+              key={i}
+              className={`h-2.5 w-2.5 rounded-full ${dotColor(days)}`}
+              title={days == null ? "not logged" : `${days}/5 days`}
+            />
+          ))}
+        </div>
+      )}
+      <p className="mt-2 text-[11.5px] text-muted-foreground">
+        <span className="font-semibold text-foreground">{attendance.loggedCount}</span> of {attendance.totalStudents} logged
+        {pendingNames.length > 0 && (
+          <>
+            {" · still pending: "}
+            <span className="font-medium text-foreground/80">
+              {pendingNames.slice(0, 2).join(", ")}
+              {pendingNames.length > 2 && ` +${pendingNames.length - 2}`}
+            </span>
+          </>
+        )}
+      </p>
+    </StatTile>
+  );
+}
+
+function ClassPulse({
+  pulse,
+  pendingNames,
+  perStudentDays,
+}: {
+  pulse: ClassStatsData["classPulse"];
+  pendingNames: string[];
+  perStudentDays: (number | null | undefined)[];
+}) {
+  return (
+    <section className="mb-7">
+      <SectionHeader title="Class pulse" icon={TrendingUp} hint="is the class healthy?" />
+      <div className="grid gap-2.5 sm:grid-cols-3">
+        <PaceCard pace={pulse.pace} />
+        <QualityCard quality={pulse.quality} />
+        <AttendanceCard
+          attendance={pulse.attendance}
+          pendingNames={pendingNames}
+          perStudentDays={perStudentDays}
+        />
+      </div>
+    </section>
+  );
+}
+
+/* ── Section 4: Sortable Roster ──────────────────── */
+
+type SortKey = "status" | "juz" | "pace" | "name";
+
+const STATUS_RANK: Record<RosterRow["status"], number> = { concern: 0, watch: 1, fine: 2 };
+
+function sortRoster(rows: RosterRow[], key: SortKey): RosterRow[] {
+  const sorted = [...rows];
+  switch (key) {
+    case "status":
+      sorted.sort(
+        (a, b) =>
+          STATUS_RANK[a.status] - STATUS_RANK[b.status] ||
+          b.juzCount - a.juzCount ||
+          a.name.localeCompare(b.name),
+      );
+      break;
+    case "juz":
+      sorted.sort((a, b) => b.juzCount - a.juzCount || a.name.localeCompare(b.name));
+      break;
+    case "pace":
+      sorted.sort((a, b) => b.pace4Week - a.pace4Week || a.name.localeCompare(b.name));
+      break;
+    case "name":
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+      break;
+  }
+  return sorted;
+}
+
+function SortBtn({
+  k,
+  active,
+  onClick,
+  align = "left",
+  children,
+}: {
+  k: SortKey;
+  active: boolean;
+  onClick: (k: SortKey) => void;
+  align?: "left" | "right";
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(k)}
+      className={`flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide transition-colors ${
+        align === "right" ? "justify-end" : ""
+      } ${active ? "text-primary" : "text-muted-foreground/70 hover:text-foreground"}`}
+    >
+      {children}
+      <ArrowUpDown className="w-3 h-3" />
+    </button>
+  );
+}
+
+function RosterTable({ roster }: { roster: RosterRow[] }) {
+  const [sortKey, setSortKey] = useState<SortKey>("status");
+  const sorted = useMemo(() => sortRoster(roster, sortKey), [roster, sortKey]);
+
+  if (roster.length === 0) {
+    return (
+      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5">
+        <p className="text-[13px] text-muted-foreground italic">No active students.</p>
+      </div>
+    );
+  }
+
+  const dayColor = (days: number | null | undefined): string => {
+    if (days == null) return "text-muted-foreground/60 italic";
+    if (days === 5) return "text-foreground";
+    if (days === 0) return "text-rose-500";
+    return "text-amber-600 dark:text-amber-400";
+  };
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm">
+      {/* Head — 12-col grid mirrors the reference's tight layout */}
+      <div className="grid grid-cols-12 gap-2 border-b border-border/50 px-4 py-2.5 bg-secondary/30">
+        <div className="col-span-4">
+          <SortBtn k="name" active={sortKey === "name"} onClick={setSortKey}>Student</SortBtn>
+        </div>
+        <div className="col-span-2">
+          <SortBtn k="juz" active={sortKey === "juz"} onClick={setSortKey}>Juz</SortBtn>
+        </div>
+        <div className="col-span-2">
+          <SortBtn k="pace" active={sortKey === "pace"} onClick={setSortKey}>Pace</SortBtn>
+        </div>
+        <div className="col-span-3 text-[11px] font-bold uppercase tracking-wide text-muted-foreground/70">
+          This week
+        </div>
+        <div className="col-span-1 text-right text-[11px] font-bold uppercase tracking-wide text-muted-foreground/70">
+          Days
+        </div>
+      </div>
+
+      {/* Rows */}
+      {sorted.map((row) => {
+        const meta = STATUS_META[row.status];
+        return (
+          <div
+            key={row.studentId}
+            className="grid grid-cols-12 items-center gap-2 border-b border-border/40 px-4 py-2.5 last:border-0 hover:bg-secondary/30 transition-colors"
+          >
+            {/* Name + status dot (status is the dot; no separate column) */}
+            <div className="col-span-4 flex items-center gap-2.5 min-w-0">
+              <span className={`h-2 w-2 shrink-0 rounded-full ${meta.dot}`} title={meta.label} />
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${getGenderDotClass(row.gender as Gender)}`} />
+              <StudentLink id={row.studentId} className="truncate text-[13px] font-semibold text-foreground">
+                {row.name}
+              </StudentLink>
+            </div>
+
+            {/* Juz */}
+            <div className="col-span-2 flex items-center gap-1.5">
+              <span className="text-[13px] font-bold text-foreground tabular-nums">{row.juzCount}</span>
+              <div className="flex-1 max-w-[36px]">
+                <JuzProgressBar juzCount={row.juzCount} currentPage={row.currentPage} showLabel={false} />
+              </div>
+            </div>
+
+            {/* Pace */}
+            <div className="col-span-2 flex items-center gap-1">
+              <span className="text-[13px] font-medium text-foreground">{formatLines(row.pace4Week, { short: true })}</span>
+              <TrendArrow direction={row.paceTrend ?? null} />
+            </div>
+
+            {/* This week — rating chip + trend */}
+            <div className="col-span-3 flex items-center gap-1.5">
+              {row.thisWeekRating ? (
+                <RatingChip rating={row.thisWeekRating} trend={row.ratingTrend ?? null} />
+              ) : (
+                <span className="text-[11.5px] font-medium italic text-muted-foreground/60">not logged</span>
+              )}
+            </div>
+
+            {/* Days /5 */}
+            <div className="col-span-1 text-right">
+              <span className={`text-[13px] font-semibold tabular-nums ${dayColor(row.daysAttended)}`}>
+                {row.daysAttended == null ? "—" : `${row.daysAttended}/5`}
+              </span>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-const RATING_META: Record<string, { label: string; color: string; bar: string }> = {
-  excellent: { label: "Excellent", color: "text-yellow-600 dark:text-yellow-400", bar: "bg-yellow-500" },
-  strong: { label: "Strong", color: "text-emerald-600 dark:text-emerald-400", bar: "bg-emerald-500" },
-  steady: { label: "Steady", color: "text-blue-600 dark:text-blue-400", bar: "bg-blue-500" },
-  needs_improvement: { label: "Needs Work", color: "text-orange-600 dark:text-orange-400", bar: "bg-orange-500" },
-  difficult_week: { label: "Difficult", color: "text-red-600 dark:text-red-400", bar: "bg-red-500" },
-};
+function RosterSection({ roster }: { roster: RosterRow[] }) {
+  return (
+    <section className="mb-7">
+      <SectionHeader title="Every student" icon={Users} hint="the full picture" />
+      <RosterTable roster={roster} />
+    </section>
+  );
+}
 
-/* ── Main Component ───────────────────────────────── */
+/* ── Section 5: Wins ─────────────────────────────── */
+
+function Celebrations({ celebrations }: { celebrations: ClassStatsData["celebrations"] }) {
+  const [showAllStreaks, setShowAllStreaks] = useState(false);
+  const visibleStreaks = showAllStreaks ? celebrations.streaks : celebrations.streaks.slice(0, 3);
+  const hasStreaks = celebrations.streaks.length > 0;
+  const hasMilestones = celebrations.milestonesThisWeek.length > 0;
+  const totals = celebrations.classTotals;
+
+  return (
+    <section className="mb-2">
+      <SectionHeader title="Wins this week" icon={Sparkles} iconColor="text-yellow-500" hint="worth celebrating" />
+
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        {/* Streaks (emerald-tinted) */}
+        <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-500/5 p-3.5">
+          <div className="flex items-center gap-2 mb-2">
+            <Flame className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <p className="text-[12.5px] font-bold text-foreground">Streaks</p>
+          </div>
+          {hasStreaks ? (
+            <>
+              <ul className="space-y-1.5">
+                {visibleStreaks.map((s) => (
+                  <li key={s.studentId} className="text-[12.5px] leading-snug">
+                    <StudentLink id={s.studentId} className="text-foreground/85">
+                      <span className="font-semibold text-foreground">{s.name}</span>
+                      <span className="text-muted-foreground">
+                        {" — "}
+                        {s.currentStreak} {s.currentStreak === 1 ? "week" : "weeks"} of perfect attendance
+                      </span>
+                    </StudentLink>
+                  </li>
+                ))}
+              </ul>
+              {celebrations.streaks.length > 3 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllStreaks((v) => !v)}
+                  className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-primary/80 hover:text-primary"
+                >
+                  <ChevronDown className={`w-3 h-3 transition-transform ${showAllStreaks ? "rotate-180" : ""}`} />
+                  {showAllStreaks ? "Show top 3" : `View all (${celebrations.streaks.length})`}
+                </button>
+              )}
+            </>
+          ) : (
+            <p className="text-[12.5px] text-muted-foreground">No active streaks yet — a perfect 5-of-5 week starts one.</p>
+          )}
+        </div>
+
+        {/* Milestones (amber-tinted) — class line totals fold into the prose here.
+            This is the ONLY place all-time totals appear, per the spec. */}
+        <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-500/5 p-3.5">
+          <div className="flex items-center gap-2 mb-2">
+            <BookOpen className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <p className="text-[12.5px] font-bold text-foreground">Milestones</p>
+          </div>
+          <div className="space-y-1.5">
+            {hasMilestones ? (
+              celebrations.milestonesThisWeek.map((m, i) => (
+                <p key={`${m.studentId}-${m.juzNumber}-${i}`} className="text-[12.5px] leading-snug text-foreground/85">
+                  <StudentLink id={m.studentId} className="font-semibold text-foreground">
+                    {m.name}
+                  </StudentLink>
+                  <span className="text-muted-foreground"> reached </span>
+                  <span className="font-semibold text-foreground">juz {m.juzNumber}</span>
+                </p>
+              ))
+            ) : (
+              <p className="text-[12.5px] text-muted-foreground leading-snug">
+                No new juz this week — keep going.
+              </p>
+            )}
+            <p className="text-[12.5px] leading-snug text-muted-foreground">
+              The class has now memorized{" "}
+              <span className="font-semibold text-foreground">{totals.totalLinesMemorized.toLocaleString()} lines</span>
+              {" "}across{" "}
+              <span className="font-semibold text-foreground">{totals.totalJuzCompleted} juz</span>
+              {" "}all-time.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Loading / Error ─────────────────────────────── */
+
+function LoadingState() {
+  return (
+    <AppLayout title="Class Stats">
+      <div className="flex items-center justify-center h-64">
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    </AppLayout>
+  );
+}
+
+function ErrorState({ message }: { message: string }) {
+  return (
+    <AppLayout title="Class Stats">
+      <div className="max-w-2xl mx-auto py-12">
+        <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-500/5 p-5">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-foreground">Couldn't load class statistics</p>
+              <p className="text-sm text-muted-foreground mt-1">{message}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
+
+/* ── Main ────────────────────────────────────────── */
 
 export default function ClassStats() {
   const { isLoading: authLoading } = useProtectedRoute();
-  const { data: stats, isLoading: statsLoading } = useGetClassStats();
-  const { data: dashboard = [], isLoading: dashLoading } = useGetDashboard();
-  const [showAllRankings, setShowAllRankings] = useState(false);
-  const [showStreaks, setShowStreaks] = useState(false);
+  const statsQ = useGetClassStats();
+  const classQ = useGetCurrentClass();
 
-  const isLoading = authLoading || statsLoading || dashLoading;
-
-  if (isLoading) {
-    return (
-      <AppLayout title="Class Stats">
-        <div className="flex items-center justify-center h-64">
-          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-      </AppLayout>
-    );
+  if (authLoading || statsQ.isPending || classQ.isPending) {
+    return <LoadingState />;
   }
 
-  // ── Derived data ──
-  const doneCount = dashboard.filter((s) => s.thisWeekDone).length;
-  const totalStudents = dashboard.length;
-  const loggedPct = totalStudents > 0 ? Math.round((doneCount / totalStudents) * 100) : 0;
+  if (statsQ.error) {
+    const msg = statsQ.error instanceof Error ? statsQ.error.message : "Unknown error.";
+    return <ErrorState message={msg} />;
+  }
 
-  // Progress bar normalization: scale so max student fills ~80%
-  const maxTotalLines = Math.max(...(stats?.studentProgress?.map((s) => s.totalLines) ?? [1]), 1);
+  const stats = statsQ.data;
+  if (!stats) {
+    return <ErrorState message="Empty response from server." />;
+  }
 
-  // Monthly comparison
-  const monthDelta = (stats?.linesThisMonth ?? 0) - (stats?.linesLastMonth ?? 0);
-  const monthUp = monthDelta >= 0;
-  const perStudentUp = (stats?.avgLinesPerStudentThisMonth ?? 0) >= (stats?.avgLinesPerStudentLastMonth ?? 0);
+  const className = classQ.data?.name ?? "Class";
 
-  // Rankings to show
-  const rankingsToShow = showAllRankings
-    ? (stats?.studentRankings ?? [])
-    : (stats?.studentRankings ?? []).slice(0, 3);
+  // Per-student dot grid + pending names for the attendance card. Derived
+  // from the roster so we don't need a second API call.
+  const perStudentDays = stats.roster.map((r) => r.daysAttended);
+  const pendingNames = stats.attention.concern
+    .filter((c) => c.flagType === "no_entry")
+    .map((c) => c.name);
 
   return (
     <AppLayout title="Class Stats">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <p className="text-sm font-bold tracking-widest text-primary uppercase mb-1">Overview</p>
-          <h1 className="font-display text-4xl font-bold text-foreground">Class Statistics</h1>
-        </div>
-
-        {/* ── Stat Cards ── */}
-        <Section delay={0.05}><div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <StatCard
-            label="Active Students"
-            value={stats?.totalStudents ?? 0}
-            sub="enrolled"
-            icon={Users}
-            color="text-primary"
-          />
-          <StatCard
-            label="Success Rate"
-            scope="Last 4 weeks"
-            value={`${stats?.averageSuccessRate4Weeks ?? 0}%`}
-            sub="days successful"
-            secondary={{ value: `${stats?.averageSuccessRate ?? 0}%`, label: "all-time" }}
-            icon={TrendingUp}
-            color="text-emerald-500"
-          />
-          <StatCard
-            label="Memorized"
-            scope="All-time"
-            value={formatLines(stats?.totalLinesMemorized ?? 0, { short: true })}
-            sub={`${(stats?.totalLinesMemorized ?? 0).toLocaleString()} lines · across the class`}
-            icon={BookOpen}
-            color="text-blue-500"
-          />
-          <StatCard
-            label="Pace / Week"
-            scope="Last 4 weeks"
-            value={formatLines(stats?.avgLinesPerWeek4Weeks ?? 0, { short: true })}
-            sub="per student"
-            secondary={{ value: formatLines(stats?.avgLinesPerWeek ?? 0, { short: true }), label: "all-time" }}
-            icon={BarChart3}
-            color="text-purple-500"
-          />
-        </div></Section>
-
-        {/* ── Weekly Trends Charts ── */}
-        {(stats?.weeklyTrends?.length ?? 0) > 0 && (() => {
-          const trends = stats!.weeklyTrends;
-          const chartData = trends.map((t) => {
-            const d = new Date(t.weekStart + "T00:00:00Z");
-            return {
-              ...t,
-              label: `${d.getUTCMonth() + 1}/${d.getUTCDate()}`,
-            };
-          });
-
-          const latestSuccess = trends[trends.length - 1]?.avgSuccessRate ?? 0;
-          const latestLines = trends[trends.length - 1]?.totalLines ?? 0;
-          const latestRating = trends[trends.length - 1]?.avgRating ?? 0;
-
-          const successValues = trends.map((t) => t.avgSuccessRate);
-          const ratingValues = trends.map((t) => t.avgRating);
-          const linesValues = trends.map((t) => t.totalLines);
-
-          const isFlat = (vals: number[]) => vals.length > 0 && vals.every((v) => v === vals[0]);
-          const successFlat = isFlat(successValues);
-          const ratingFlat = isFlat(ratingValues);
-          const linesFlat = isFlat(linesValues);
-
-          const maxLines = Math.max(...linesValues, 1);
-          const linesCeil = Math.ceil(maxLines * 1.2);
-
-          const gridStroke = "rgba(128,128,128,0.08)";
-          const axisTickStyle = { fontSize: 10, fill: "hsl(var(--muted-foreground))" };
-
-          const CustomTooltip = ({ active, payload, label, unit }: { active?: boolean; payload?: Array<{ value: number }>; label?: string; unit: string }) => {
-            if (!active || !payload?.length) return null;
-            return (
-              <div className="bg-popover border border-border rounded-lg px-3 py-1.5 shadow-lg text-xs">
-                <p className="text-muted-foreground font-medium">{label}</p>
-                <p className="font-bold text-foreground">{payload[0].value}{unit}</p>
-              </div>
-            );
-          };
-
-          return (
-            <Section delay={0.15}>
-            <div className="bg-card rounded-3xl border border-border/50 shadow-sm p-6 mb-6">
-              <h2 className="font-display font-bold text-xl text-foreground flex items-center gap-2 mb-5">
-                <TrendingUp className="w-5 h-5 text-primary" /> Class Trends (Last 8 Weeks)
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Success Rate — Area Chart, 0–100% fixed */}
-                <div>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">Success Rate</p>
-                  <div className="h-[190px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} horizontal vertical={false} />
-                        <XAxis dataKey="label" tick={axisTickStyle} axisLine={false} tickLine={false} />
-                        <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={axisTickStyle} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}%`} />
-                        <Tooltip content={<CustomTooltip unit="%" />} />
-                        <defs>
-                          <linearGradient id="successGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0.3} />
-                            <stop offset="100%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0.02} />
-                          </linearGradient>
-                        </defs>
-                        <Area
-                          type="monotone"
-                          dataKey="avgSuccessRate"
-                          stroke="hsl(142, 76%, 36%)"
-                          strokeWidth={2}
-                          fill="url(#successGrad)"
-                          dot={{ r: 3, fill: "hsl(142, 76%, 36%)", strokeWidth: 0 }}
-                          isAnimationActive={false}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">This week</p>
-                    <p className="text-base font-bold text-foreground">{latestSuccess}%</p>
-                    {successFlat && <p className="text-[10px] text-muted-foreground font-medium">· consistent</p>}
-                  </div>
-                </div>
-
-                {/* Lines / Week — Bar Chart, 0 to max+20% */}
-                <div>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">Lines / Week</p>
-                  <div className="h-[190px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData} margin={{ top: 16, right: 4, bottom: 0, left: -20 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} horizontal vertical={false} />
-                        <XAxis dataKey="label" tick={axisTickStyle} axisLine={false} tickLine={false} />
-                        <YAxis domain={[0, linesCeil]} tick={axisTickStyle} axisLine={false} tickLine={false} />
-                        <Tooltip content={<CustomTooltip unit=" lines" />} />
-                        <Bar
-                          dataKey="totalLines"
-                          radius={[4, 4, 0, 0]}
-                          isAnimationActive={false}
-                          label={{ position: "top", fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
-                        >
-                          {chartData.map((_, idx) => (
-                            <Cell
-                              key={idx}
-                              fill={idx === chartData.length - 1 ? "hsl(142, 76%, 36%)" : "hsl(142, 76%, 36%, 0.5)"}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">This week</p>
-                    <p className="text-base font-bold text-foreground">{latestLines}</p>
-                    {linesFlat && <p className="text-[10px] text-muted-foreground font-medium">· consistent</p>}
-                  </div>
-                </div>
-
-                {/* Avg Rating — Area Chart, 1–10 fixed */}
-                <div>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">Avg Rating</p>
-                  <div className="h-[190px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} horizontal vertical={false} />
-                        <XAxis dataKey="label" tick={axisTickStyle} axisLine={false} tickLine={false} />
-                        <YAxis domain={[1, 10]} ticks={[1, 3, 5, 7, 10]} tick={axisTickStyle} axisLine={false} tickLine={false} />
-                        <Tooltip content={<CustomTooltip unit="" />} />
-                        <defs>
-                          <linearGradient id="ratingGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="hsl(38, 92%, 50%)" stopOpacity={0.3} />
-                            <stop offset="100%" stopColor="hsl(38, 92%, 50%)" stopOpacity={0.02} />
-                          </linearGradient>
-                        </defs>
-                        <Area
-                          type="monotone"
-                          dataKey="avgRating"
-                          stroke="hsl(38, 92%, 50%)"
-                          strokeWidth={2}
-                          fill="url(#ratingGrad)"
-                          dot={{ r: 3, fill: "hsl(38, 92%, 50%)", strokeWidth: 0 }}
-                          isAnimationActive={false}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">This week</p>
-                    <p className="text-base font-bold text-foreground">{latestRating}</p>
-                    {ratingFlat && <p className="text-[10px] text-muted-foreground font-medium">· consistent</p>}
-                  </div>
-                </div>
-              </div>
-            </div>
-            </Section>
-          );
-        })()}
-
-        {/* ── Weekly Logging Status ── */}
-        <Section delay={0.2}>
-        <div className="bg-card rounded-3xl border border-border/50 shadow-sm p-6 mb-6">
-          <h2 className="font-display font-bold text-xl text-foreground flex items-center gap-2 mb-4">
-            <ClipboardCheck className="w-5 h-5 text-primary" /> Weekly Logging Status
-          </h2>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary rounded-full transition-all duration-500"
-                style={{ width: `${loggedPct}%` }}
-              />
-            </div>
-            <span className="text-sm font-bold text-foreground whitespace-nowrap">
-              {doneCount} of {totalStudents}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-            {dashboard.map((s) => (
-              <StudentLink key={s.id} id={s.id}>
-                <div
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
-                    s.thisWeekDone
-                      ? "bg-emerald-500/10 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300"
-                      : "bg-secondary/50 border-border/50 text-muted-foreground"
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${getGenderDotClass(s.gender as Gender)}`} />
-                  {s.thisWeekDone ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                  ) : (
-                    <Clock className="w-3.5 h-3.5 shrink-0" />
-                  )}
-                  <span className="truncate" title={s.name}>{s.name.split(" ")[0]}</span>
-                </div>
-              </StudentLink>
-            ))}
-          </div>
-        </div>
-        </Section>
-
-        {/* ── Class Progress (contextual bars) ── */}
-        <Section delay={0.25}>
-        <div className="bg-card rounded-3xl border border-border/50 shadow-sm p-6 mb-6">
-          <h2 className="font-display font-bold text-xl text-foreground flex items-center gap-2 mb-5">
-            <BookOpen className="w-5 h-5 text-primary" /> Class Progress
-          </h2>
-          <div className="space-y-3">
-            {(stats?.studentProgress ?? []).map((s) => {
-              const barPct = maxTotalLines > 0 ? Math.max((s.totalLines / maxTotalLines) * 80, 2) : 2;
-              const barColor = s.totalLines > maxTotalLines * 0.5
-                ? "bg-emerald-500"
-                : s.totalLines > maxTotalLines * 0.2
-                ? "bg-blue-500"
-                : "bg-zinc-400 dark:bg-zinc-600";
-              return (
-                <StudentLink key={s.studentId} id={s.studentId}>
-                  <div className="flex items-center gap-3">
-                    <span className="w-28 sm:w-36 text-sm font-semibold text-foreground truncate shrink-0">{s.name}</span>
-                    <div className="flex-1 h-4 bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                        style={{ width: `${barPct}%` }}
-                      />
-                    </div>
-                    <div className="text-right shrink-0 w-28">
-                      <span className="text-xs font-bold text-foreground">{s.totalJuz} juz</span>
-                      <span className="text-[10px] text-muted-foreground ml-1.5">{s.weeklyPace}/wk</span>
-                    </div>
-                  </div>
-                </StudentLink>
-              );
-            })}
-            {(stats?.studentProgress ?? []).length === 0 && (
-              <p className="text-muted-foreground italic">No students yet.</p>
-            )}
-          </div>
-        </div>
-        </Section>
-
-        {/* ── Student Rankings + Needs Attention ── */}
-        <Section delay={0.3}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {/* Student Rankings (composite score) */}
-          <div className="bg-card rounded-3xl border border-border/50 shadow-sm p-6">
-            <h2 className="font-display font-bold text-xl text-foreground flex items-center gap-2 mb-5">
-              <Award className="w-5 h-5 text-yellow-500" /> Student Rankings
-            </h2>
-            {rankingsToShow.length === 0 ? (
-              <p className="text-muted-foreground italic">No data yet.</p>
-            ) : (
-              <>
-                <div className="space-y-3">
-                  {rankingsToShow.map((s, i) => (
-                    <StudentLink key={s.studentId} id={s.studentId}>
-                      <div className="flex items-center gap-4">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                            i === 0
-                              ? "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400"
-                              : i === 1
-                              ? "bg-zinc-400/20 text-zinc-600 dark:text-zinc-400"
-                              : i === 2
-                              ? "bg-orange-500/20 text-orange-600 dark:text-orange-400"
-                              : "bg-secondary text-muted-foreground"
-                          }`}
-                        >
-                          {i + 1}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-foreground truncate">{s.name}</p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <div className="font-bold text-lg text-foreground">{s.compositeScore}</div>
-                          <div className="text-[10px] text-muted-foreground">/ 100</div>
-                        </div>
-                      </div>
-                    </StudentLink>
-                  ))}
-                </div>
-                {(stats?.studentRankings?.length ?? 0) > 3 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAllRankings(!showAllRankings)}
-                    className="mt-4 flex items-center gap-1 text-xs font-semibold text-primary/70 hover:text-primary transition-colors"
-                  >
-                    <ChevronDown className={`w-3 h-3 transition-transform ${showAllRankings ? "rotate-180" : ""}`} />
-                    {showAllRankings ? "Show top 3" : "View all rankings"}
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Needs Attention (intelligent flags — genuine concerns only) */}
-          <div className="bg-card rounded-3xl border border-border/50 shadow-sm p-6">
-            <h2 className="font-display font-bold text-xl text-foreground flex items-center gap-2 mb-5">
-              <AlertTriangle className="w-5 h-5 text-orange-500" /> Needs Attention
-            </h2>
-            {(stats?.attentionFlags ?? []).length === 0 ? (
-              <div>
-                <p className="text-muted-foreground italic">No concerns to flag.</p>
-                <p className="text-[11px] text-muted-foreground mt-2">
-                  Checking success rate, ratings, and attendance over the last 2 weeks. Students who haven&apos;t logged this week are shown separately.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {stats!.attentionFlags.map((s) => (
-                  <StudentLink key={s.studentId} id={s.studentId}>
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center shrink-0 mt-0.5">
-                        <AlertTriangle className="w-4 h-4 text-red-500" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-foreground">{s.name}</p>
-                        <div className="flex flex-wrap gap-1.5 mt-1">
-                          {s.flags.map((f, fi) => (
-                            <span
-                              key={fi}
-                              className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400"
-                            >
-                              {f.label}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </StudentLink>
-                ))}
-              </div>
-            )}
-
-            {/* Not Yet Logged — separate from concerns. Calm Mon-Wed,
-                gentle Thu, escalates Fri+. Collapses to class-level when all unlogged. */}
-            {(stats?.notYetLogged?.length ?? 0) > 0 && stats?.classWeekStatus && (() => {
-              const cws = stats.classWeekStatus;
-              const phase = cws.weekPhase;
-              const allUnlogged = cws.allUnlogged;
-              const tone = phase === "late" ? "amber" : phase === "mid" ? "muted-strong" : "muted";
-              const wrapClass =
-                tone === "amber"
-                  ? "border-amber-200 dark:border-amber-800/50 bg-amber-500/5"
-                  : "border-border/50 bg-muted/30";
-              const labelClass =
-                tone === "amber"
-                  ? "text-amber-700 dark:text-amber-300"
-                  : tone === "muted-strong"
-                  ? "text-foreground"
-                  : "text-muted-foreground";
-              return (
-                <div className={`mt-5 pt-5 border-t border-border/30`}>
-                  <div className={`rounded-xl border p-3 ${wrapClass}`}>
-                    <p className={`text-xs font-bold uppercase tracking-wider ${labelClass}`}>
-                      {allUnlogged ? "No entries yet this week" : "Not yet logged this week"}
-                    </p>
-                    {allUnlogged ? (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {cws.unloggedCount} of {cws.totalStudents} students. {phase === "late" ? "It's late in the week — log entries today." : phase === "mid" ? "Friday is tomorrow." : "Normal early-week state."}
-                      </p>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {stats.notYetLogged.map((s) => (
-                          <StudentLink key={s.studentId} id={s.studentId}>
-                            <span className="text-xs font-medium px-2 py-1 rounded-full bg-background border border-border/50 text-foreground hover:border-primary/50">
-                              {s.name}
-                            </span>
-                          </StudentLink>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-        </Section>
-
-        {/* ── Student Spotlight & Monthly Comparison ── */}
-        <Section delay={0.35}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {/* Student Spotlight (replaces Streak Leaderboard) */}
-          <div className="bg-card rounded-3xl border border-border/50 shadow-sm p-6">
-            <h2 className="font-display font-bold text-xl text-foreground flex items-center gap-2 mb-5">
-              <Sparkles className="w-5 h-5 text-yellow-500" /> Student Spotlight
-            </h2>
-            {(stats?.spotlights ?? []).length === 0 ? (
-              <p className="text-muted-foreground italic">Consistent week across the class — no major changes.</p>
-            ) : (
-              <div className="space-y-3">
-                {stats!.spotlights.map((s, i) => (
-                  <StudentLink key={`${s.studentId}-${i}`} id={s.studentId}>
-                    <div className="flex items-start gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                        s.category === "positive"
-                          ? "bg-emerald-500/10"
-                          : "bg-amber-500/10"
-                      }`}>
-                        {s.category === "positive" ? (
-                          <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                        ) : (
-                          <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-foreground text-sm">{s.name}</p>
-                        <p className={`text-xs mt-0.5 ${
-                          s.category === "positive"
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-amber-600 dark:text-amber-400"
-                        }`}>
-                          {s.insightText}
-                        </p>
-                      </div>
-                    </div>
-                  </StudentLink>
-                ))}
-              </div>
-            )}
-
-            {/* Collapsible streaks */}
-            {(stats?.streakLeaderboard ?? []).length > 0 && (
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowStreaks(!showStreaks)}
-                  className="flex items-center gap-1 text-xs font-semibold text-primary/70 hover:text-primary transition-colors"
-                >
-                  <ChevronDown className={`w-3 h-3 transition-transform ${showStreaks ? "rotate-180" : ""}`} />
-                  {showStreaks ? "Hide streaks" : "View all streaks"}
-                </button>
-                {showStreaks && (
-                  <div className="mt-3 pt-3 border-t border-border/30">
-                    <div className="flex items-center gap-3 mb-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      <span className="flex-1">Student</span>
-                      <span className="w-16 text-center">Current</span>
-                      <span className="w-16 text-center">Best (12wk)</span>
-                    </div>
-                    <div className="space-y-2">
-                      {stats!.streakLeaderboard.map((s) => {
-                        const stale = (s.weeksSinceLastEntry ?? 0) > 2;
-                        return (
-                        <StudentLink key={s.studentId} id={s.studentId}>
-                          <div className="flex items-center gap-3">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-foreground text-sm truncate">{s.name}</p>
-                              {stale && (
-                                <p className="text-[10px] text-muted-foreground/80 font-medium">
-                                  Paused &middot; last logged {s.weeksSinceLastEntry}w ago
-                                </p>
-                              )}
-                            </div>
-                            <div className="w-16 text-center">
-                              <span className={`text-sm font-bold whitespace-nowrap ${
-                                stale
-                                  ? "text-muted-foreground"
-                                  : s.currentStreak >= 3
-                                  ? "text-orange-600 dark:text-orange-400"
-                                  : s.currentStreak === 0
-                                  ? "text-muted-foreground"
-                                  : "text-foreground"
-                              }`}>
-                                {stale ? (
-                                  <Snowflake className="w-4 h-4 inline text-muted-foreground/60" />
-                                ) : s.currentStreak === 0 ? (
-                                  <Snowflake className="w-4 h-4 inline text-blue-400" />
-                                ) : s.currentStreak >= 3 ? (
-                                  <>{"\uD83D\uDD25"} {s.currentStreak}</>
-                                ) : (
-                                  s.currentStreak
-                                )}
-                              </span>
-                            </div>
-                            <div className="w-16 text-center">
-                              <span className="text-sm font-bold text-muted-foreground">
-                                {s.best12WeekStreak}
-                              </span>
-                            </div>
-                          </div>
-                        </StudentLink>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Monthly Comparison (enhanced with decomposition) */}
-          <div className="bg-card rounded-3xl border border-border/50 shadow-sm p-6">
-            <h2 className="font-display font-bold text-xl text-foreground flex items-center gap-2 mb-5">
-              <Calendar className="w-5 h-5 text-blue-500" /> Monthly Comparison
-            </h2>
-
-            {/* Total memorized row */}
-            <div className="flex items-end gap-6 mb-4">
-              <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">This Month</p>
-                <p className="text-4xl font-display font-bold text-foreground">{formatLines(stats?.linesThisMonth ?? 0, { short: true })}</p>
-                <p className="text-sm text-muted-foreground">{(stats?.linesThisMonth ?? 0) >= 15 ? `${stats?.linesThisMonth ?? 0} lines` : "memorized"}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Last Month</p>
-                <p className="text-4xl font-display font-bold text-muted-foreground">{formatLines(stats?.linesLastMonth ?? 0, { short: true })}</p>
-                <p className="text-sm text-muted-foreground">{(stats?.linesLastMonth ?? 0) >= 15 ? `${stats?.linesLastMonth ?? 0} lines` : "memorized"}</p>
-              </div>
-            </div>
-            {((stats?.linesThisMonth ?? 0) > 0 || (stats?.linesLastMonth ?? 0) > 0) && (
-              <div className={`flex items-center gap-1.5 text-sm font-bold ${monthUp ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                {monthUp ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-                {monthUp ? "+" : ""}{formatLines(monthDelta)}
-              </div>
-            )}
-
-            {/* Per-student average row */}
-            <div className="mt-4 pt-4 border-t border-border/30 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Avg / Student</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-foreground">{stats?.avgLinesPerStudentThisMonth ?? 0}</span>
-                  <span className="text-xs text-muted-foreground">vs</span>
-                  <span className="text-sm font-bold text-muted-foreground">{stats?.avgLinesPerStudentLastMonth ?? 0}</span>
-                  {((stats?.avgLinesPerStudentThisMonth ?? 0) > 0 || (stats?.avgLinesPerStudentLastMonth ?? 0) > 0) && (
-                    perStudentUp
-                      ? <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
-                      : <ArrowDownRight className="w-3.5 h-3.5 text-zinc-400" />
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Active Students</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-foreground">{stats?.activeStudentsThisMonth ?? 0}</span>
-                  <span className="text-xs text-muted-foreground">vs</span>
-                  <span className="text-sm font-bold text-muted-foreground">{stats?.activeStudentsLastMonth ?? 0}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Decomposition: School days + lines/day */}
-            {stats?.monthlyDecomposition && (
-              <div className="mt-4 pt-4 border-t border-border/30 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">School Days</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-foreground">{stats.monthlyDecomposition.schoolDaysThisMonth}</span>
-                    <span className="text-xs text-muted-foreground">vs</span>
-                    <span className="text-sm font-bold text-muted-foreground">{stats.monthlyDecomposition.schoolDaysLastMonth}</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Lines / School Day</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-foreground">{stats.monthlyDecomposition.linesPerSchoolDayThisMonth}</span>
-                    <span className="text-xs text-muted-foreground">vs</span>
-                    <span className="text-sm font-bold text-muted-foreground">{stats.monthlyDecomposition.linesPerSchoolDayLastMonth}</span>
-                    {stats.monthlyDecomposition.linesPerSchoolDayThisMonth >= stats.monthlyDecomposition.linesPerSchoolDayLastMonth
-                      ? <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
-                      : <ArrowDownRight className="w-3.5 h-3.5 text-zinc-400" />
-                    }
-                  </div>
-                </div>
-                {stats.monthlyDecomposition.biggestContributors.length > 0 && (
-                  <div className="mt-2 pt-2">
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Biggest Contributors</p>
-                    <div className="space-y-1">
-                      {stats.monthlyDecomposition.biggestContributors.map((c) => (
-                        <StudentLink key={c.studentId} id={c.studentId}>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-foreground">{c.name}</span>
-                            <span className={`text-sm font-bold ${
-                              c.linesDelta >= 0
-                                ? "text-emerald-600 dark:text-emerald-400"
-                                : "text-red-600 dark:text-red-400"
-                            }`}>
-                              {c.linesDelta >= 0 ? "+" : ""}{c.linesDelta}
-                            </span>
-                          </div>
-                        </StudentLink>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-        </Section>
-
-        {/* ── Rating Distribution & Attendance/Summary ── */}
-        <Section delay={0.4}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Rating Distribution (week-over-week) */}
-          <div className="bg-card rounded-3xl border border-border/50 shadow-sm p-6">
-            <h2 className="font-display font-bold text-xl text-foreground flex items-center gap-2 mb-5">
-              <BarChart3 className="w-5 h-5 text-purple-500" /> Rating Distribution
-            </h2>
-            <p className="text-xs text-muted-foreground mb-4">This week vs last week</p>
-            {(() => {
-              const distributions = stats?.ratingDistributions ?? [];
-              const thisWeekDist = distributions[0];
-              const lastWeekDist = distributions[1];
-              const fourWeeksAgoDist = distributions[4];
-
-              if (!thisWeekDist) return <p className="text-muted-foreground italic">No rated entries yet.</p>;
-
-              const thisWeekCounts = thisWeekDist.counts;
-              const totalRated = Object.values(thisWeekCounts).reduce((s, v) => s + v, 0);
-
-              if (totalRated === 0) return <p className="text-muted-foreground italic">No rated entries yet.</p>;
-
-              return (
-                <div>
-                  <div className="space-y-3">
-                    {Object.entries(RATING_META).map(([key, meta]) => {
-                      const count = thisWeekCounts[key as keyof typeof thisWeekCounts] ?? 0;
-                      const lastCount = lastWeekDist?.counts?.[key as keyof typeof thisWeekCounts] ?? 0;
-                      const delta = count - lastCount;
-                      const pct = Math.round((count / totalRated) * 100);
-                      return (
-                        <div key={key} className="flex items-center gap-3">
-                          <span className={`text-sm font-semibold w-24 shrink-0 ${meta.color}`}>{meta.label}</span>
-                          <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all duration-500 ${meta.bar}`}
-                              style={{ width: `${Math.max(pct, count > 0 ? 4 : 0)}%` }}
-                            />
-                          </div>
-                          <span className="text-xs font-bold text-muted-foreground w-6 text-right">{count}</span>
-                          <span className={`text-[10px] font-bold w-8 text-right ${
-                            delta > 0 ? "text-emerald-600 dark:text-emerald-400"
-                              : delta < 0 ? "text-amber-600 dark:text-amber-400"
-                              : "text-muted-foreground"
-                          }`}>
-                            {delta > 0 ? `↑${delta}` : delta < 0 ? `↓${Math.abs(delta)}` : "—"}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {fourWeeksAgoDist && (
-                    <p className="text-[10px] text-muted-foreground mt-4 pt-3 border-t border-border/30">
-                      4 weeks ago: {Object.entries(RATING_META).map(([key, meta]) => {
-                        const c = fourWeeksAgoDist.counts[key as keyof typeof thisWeekCounts] ?? 0;
-                        return c > 0 ? `${meta.label} ${c}` : null;
-                      }).filter(Boolean).join(" · ") || "No data"}
-                    </p>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* Attendance / This Week Summary (conditional) */}
-          <div className="bg-card rounded-3xl border border-border/50 shadow-sm p-6">
-            {(() => {
-              let totalAttended = 0;
-              let entryCount = 0;
-              for (const s of dashboard) {
-                if (s.thisWeekEntry) {
-                  totalAttended += s.thisWeekEntry.daysAttended;
-                  entryCount++;
-                }
-              }
-              if (entryCount === 0) {
-                return (
-                  <>
-                    <h2 className="font-display font-bold text-xl text-foreground flex items-center gap-2 mb-5">
-                      <Users className="w-5 h-5 text-primary" /> Attendance
-                    </h2>
-                    <p className="text-muted-foreground italic">No entries yet.</p>
-                  </>
-                );
-              }
-
-              const attendancePct = Math.round((totalAttended / (entryCount * 5)) * 100);
-
-              // High attendance: compact bar + This Week Summary
-              if (attendancePct >= 95) {
-                const summary = stats?.thisWeekSummary;
-                return (
-                  <>
-                    <h2 className="font-display font-bold text-xl text-foreground flex items-center gap-2 mb-5">
-                      <BarChart3 className="w-5 h-5 text-primary" /> This Week Summary
-                    </h2>
-                    {/* Compact attendance indicator */}
-                    <div className="flex items-center gap-2 mb-5 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800">
-                      <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                      <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">Attendance: {attendancePct}%</span>
-                    </div>
-                    {summary ? (
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="text-center">
-                          <p className="text-2xl font-display font-bold text-foreground">{summary.totalClassLines}</p>
-                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Class Lines</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-2xl font-display font-bold text-foreground">{summary.avgLinesPerStudent}</p>
-                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Avg / Student</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-2xl font-display font-bold text-foreground">{summary.bestWeekLinesThisMonth}</p>
-                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Best Week</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-muted-foreground italic">No summary data.</p>
-                    )}
-                  </>
-                );
-              }
-
-              // Low attendance: full card + absent students
-              const attendanceColor = attendancePct >= 80 ? "text-emerald-600 dark:text-emerald-400" : attendancePct >= 60 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400";
-              return (
-                <>
-                  <h2 className="font-display font-bold text-xl text-foreground flex items-center gap-2 mb-5">
-                    <Users className="w-5 h-5 text-primary" /> Attendance Rate
-                  </h2>
-                  <div className="flex flex-col items-center py-2">
-                    <div className={`text-5xl font-display font-bold ${attendanceColor}`}>
-                      {attendancePct}%
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      avg {(totalAttended / entryCount).toFixed(1)} of 5 days
-                    </p>
-                    <div className="w-full mt-3 h-3 bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          attendancePct >= 80 ? "bg-emerald-500"
-                          : attendancePct >= 60 ? "bg-yellow-500"
-                          : "bg-red-500"
-                        }`}
-                        style={{ width: `${attendancePct}%` }}
-                      />
-                    </div>
-                  </div>
-                  {(stats?.absentStudents ?? []).length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-border/30">
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Students Below 5 Days</p>
-                      <div className="space-y-1.5">
-                        {stats!.absentStudents.map((s) => (
-                          <StudentLink key={s.studentId} id={s.studentId}>
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-semibold text-foreground">{s.name}</span>
-                              <span className={`text-xs font-bold ${
-                                s.daysAttended < 4 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"
-                              }`}>
-                                {s.daysAttended}/5 days
-                              </span>
-                            </div>
-                          </StudentLink>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-        </div>
-        </Section>
+      <div className="mx-auto max-w-4xl pb-12">
+        <HeaderVerdict
+          className={className}
+          weekRange={stats.weekRange}
+          sentence={stats.verdict.sentence}
+        />
+        <NeedsAttention attention={stats.attention} />
+        <ClassPulse
+          pulse={stats.classPulse}
+          pendingNames={pendingNames}
+          perStudentDays={perStudentDays}
+        />
+        <RosterSection roster={stats.roster} />
+        <Celebrations celebrations={stats.celebrations} />
       </div>
     </AppLayout>
   );

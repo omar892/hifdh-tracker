@@ -5,48 +5,18 @@
  * Quran Hifdh Tracker API
  * OpenAPI spec version: 0.3.0
  */
-import type { AbsentStudent } from "./absentStudent";
-import type { ClassWeekStatus } from "./classWeekStatus";
-import type { MonthlyDecomposition } from "./monthlyDecomposition";
-import type { NotYetLogged } from "./notYetLogged";
-import type { RatingDistributionWeek } from "./ratingDistributionWeek";
-import type { StudentAttention } from "./studentAttention";
-import type { StudentPerformance } from "./studentPerformance";
-import type { StudentProgress } from "./studentProgress";
-import type { StudentRanking } from "./studentRanking";
-import type { StudentSpotlight } from "./studentSpotlight";
-import type { StudentStreak } from "./studentStreak";
-import type { ThisWeekSummary } from "./thisWeekSummary";
-import type { WeekTrend } from "./weekTrend";
+import type { AttentionBlock } from "./attentionBlock";
+import type { Celebrations } from "./celebrations";
+import type { ClassPulse } from "./classPulse";
+import type { RosterRow } from "./rosterRow";
+import type { Verdict } from "./verdict";
+import type { WeekRange } from "./weekRange";
 
 export interface ClassStats {
-  totalStudents: number;
-  /** All-time average success rate across students. Historical lens. */
-  averageSuccessRate: number;
-  /** Average success rate over the last 4 weeks. Only counts students who logged at least one entry in that window. */
-  averageSuccessRate4Weeks: number;
-  totalLinesMemorized: number;
-  /** Average lines per student per week, scoped to last 4 weeks. */
-  avgLinesPerWeek4Weeks: number;
-  avgLinesPerWeek: number;
-  topPerformers: StudentPerformance[];
-  needsAttention: StudentPerformance[];
-  studentProgress: StudentProgress[];
-  studentRankings: StudentRanking[];
-  attentionFlags: StudentAttention[];
-  weeklyTrends: WeekTrend[];
-  streakLeaderboard: StudentStreak[];
-  linesThisMonth: number;
-  linesLastMonth: number;
-  activeStudentsThisMonth: number;
-  activeStudentsLastMonth: number;
-  avgLinesPerStudentThisMonth: number;
-  avgLinesPerStudentLastMonth: number;
-  spotlights: StudentSpotlight[];
-  monthlyDecomposition: MonthlyDecomposition;
-  ratingDistributions: RatingDistributionWeek[];
-  thisWeekSummary: ThisWeekSummary;
-  absentStudents: AbsentStudent[];
-  notYetLogged: NotYetLogged[];
-  classWeekStatus: ClassWeekStatus;
+  weekRange: WeekRange;
+  verdict: Verdict;
+  attention: AttentionBlock;
+  classPulse: ClassPulse;
+  roster: RosterRow[];
+  celebrations: Celebrations;
 }

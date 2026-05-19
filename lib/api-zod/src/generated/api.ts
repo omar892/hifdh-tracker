@@ -645,169 +645,194 @@ export const GetDashboardResponse = zod.array(GetDashboardResponseItem);
  * @summary Class-wide statistics
  */
 export const GetClassStatsResponse = zod.object({
-  totalStudents: zod.number(),
-  averageSuccessRate: zod
-    .number()
-    .describe(
-      "All-time average success rate across students. Historical lens.",
-    ),
-  averageSuccessRate4Weeks: zod
-    .number()
-    .describe(
-      "Average success rate over the last 4 weeks. Only counts students who logged at least one entry in that window.",
-    ),
-  totalLinesMemorized: zod.number(),
-  avgLinesPerWeek4Weeks: zod
-    .number()
-    .describe("Average lines per student per week, scoped to last 4 weeks."),
-  avgLinesPerWeek: zod.number(),
-  topPerformers: zod.array(
-    zod.object({
-      studentId: zod.number(),
-      name: zod.string(),
-      successRate: zod.number(),
-    }),
-  ),
-  needsAttention: zod.array(
-    zod.object({
-      studentId: zod.number(),
-      name: zod.string(),
-      successRate: zod.number(),
-    }),
-  ),
-  studentProgress: zod.array(
-    zod.object({
-      studentId: zod.number(),
-      name: zod.string(),
-      totalLines: zod.number(),
-      totalJuz: zod.number(),
-      weeklyPace: zod.number(),
-    }),
-  ),
-  studentRankings: zod.array(
-    zod.object({
-      studentId: zod.number(),
-      name: zod.string(),
-      compositeScore: zod.number(),
-      successRate: zod.number(),
-      weeklyPace: zod.number(),
-      consistency: zod.number(),
-    }),
-  ),
-  attentionFlags: zod.array(
-    zod.object({
-      studentId: zod.number(),
-      name: zod.string(),
-      flags: zod.array(
-        zod.object({
-          type: zod.string(),
-          label: zod.string(),
-        }),
+  weekRange: zod.object({
+    weekStartDate: zod.string().describe("ISO date of this week's Monday."),
+    weekEndDate: zod.string().describe("ISO date of this week's Friday."),
+  }),
+  verdict: zod.object({
+    paceTrend: zod.enum(["up", "flat", "down"]),
+    qualityTrend: zod.enum(["up", "flat", "down"]),
+    concernCount: zod.number(),
+    watchCount: zod.number(),
+    mostUrgentName: zod.string().nullable(),
+    sentence: zod
+      .string()
+      .describe(
+        "One-sentence narrative summary composed server-side from the trends and flag counts.",
       ),
-    }),
-  ),
-  weeklyTrends: zod.array(
-    zod.object({
-      weekStart: zod.string(),
-      avgSuccessRate: zod.number(),
-      totalLines: zod.number(),
-      avgRating: zod.number(),
-    }),
-  ),
-  streakLeaderboard: zod.array(
-    zod.object({
-      studentId: zod.number(),
-      name: zod.string(),
-      currentStreak: zod
-        .number()
-        .describe(
-          "Stale-aware — returns 0 if the most-recent entry is more than 2 weeks old.",
-        ),
-      best12WeekStreak: zod.number(),
-      weeksSinceLastEntry: zod.number().nullish(),
-    }),
-  ),
-  linesThisMonth: zod.number(),
-  linesLastMonth: zod.number(),
-  activeStudentsThisMonth: zod.number(),
-  activeStudentsLastMonth: zod.number(),
-  avgLinesPerStudentThisMonth: zod.number(),
-  avgLinesPerStudentLastMonth: zod.number(),
-  spotlights: zod.array(
-    zod.object({
-      studentId: zod.number(),
-      name: zod.string(),
-      insightText: zod.string(),
-      type: zod.enum([
-        "big_increase",
-        "first_excellent",
-        "personal_record",
-        "milestone_page",
-        "perfect_streak",
-        "big_drop",
-        "streak_break",
-        "rating_drop",
-      ]),
-      category: zod.enum(["positive", "concern"]),
-    }),
-  ),
-  monthlyDecomposition: zod.object({
-    schoolDaysThisMonth: zod.number(),
-    schoolDaysLastMonth: zod.number(),
-    linesPerSchoolDayThisMonth: zod.number(),
-    linesPerSchoolDayLastMonth: zod.number(),
-    biggestContributors: zod.array(
+  }),
+  attention: zod.object({
+    concern: zod.array(
       zod.object({
         studentId: zod.number(),
         name: zod.string(),
-        linesDelta: zod.number(),
+        tier: zod.enum(["concern", "watch"]),
+        flagType: zod.enum([
+          "no_entry",
+          "zero_attendance",
+          "rating_drop",
+          "rating_decline",
+          "low_pace",
+        ]),
+        reason: zod
+          .string()
+          .describe(
+            'Precise data observation in plain English (\"Rating fell Strong → Steady\").',
+          ),
+        focus: zod
+          .string()
+          .describe(
+            'Single keyword pointing at the dimension that\'s slipping — \"Logging\", \"Attendance\", \"Review\", \"New material\", \"Recitation\", or \"Pace\".',
+          ),
+        action: zod
+          .string()
+          .describe(
+            "One-sentence suggested next step, templated per flag type. Uses hifdh terminology (sabaq = new lesson, dohra = revision). Not personalized advice; the teacher decides.",
+          ),
+      }),
+    ),
+    watch: zod.array(
+      zod.object({
+        studentId: zod.number(),
+        name: zod.string(),
+        tier: zod.enum(["concern", "watch"]),
+        flagType: zod.enum([
+          "no_entry",
+          "zero_attendance",
+          "rating_drop",
+          "rating_decline",
+          "low_pace",
+        ]),
+        reason: zod
+          .string()
+          .describe(
+            'Precise data observation in plain English (\"Rating fell Strong → Steady\").',
+          ),
+        focus: zod
+          .string()
+          .describe(
+            'Single keyword pointing at the dimension that\'s slipping — \"Logging\", \"Attendance\", \"Review\", \"New material\", \"Recitation\", or \"Pace\".',
+          ),
+        action: zod
+          .string()
+          .describe(
+            "One-sentence suggested next step, templated per flag type. Uses hifdh terminology (sabaq = new lesson, dohra = revision). Not personalized advice; the teacher decides.",
+          ),
+      }),
+    ),
+    borderline: zod.array(
+      zod.object({
+        studentId: zod.number(),
+        name: zod.string(),
+        hint: zod
+          .string()
+          .describe('Why they\'re borderline (e.g. \"attended 3\/5 days\").'),
       }),
     ),
   }),
-  ratingDistributions: zod.array(
-    zod.object({
-      weekStart: zod.string(),
-      counts: zod.object({
+  classPulse: zod.object({
+    pace: zod.object({
+      thisWeek: zod.number().describe("Lines per student this week."),
+      avg4Week: zod
+        .number()
+        .describe(
+          "Lines per student per week, averaged over the last 4 calendar weeks.",
+        ),
+      delta: zod.number().describe("thisWeek minus avg4Week."),
+      sparkline: zod
+        .array(zod.number())
+        .describe(
+          "8-week sparkline (oldest → newest) of lines per student per week.",
+        ),
+    }),
+    quality: zod.object({
+      strongOrAbove: zod
+        .number()
+        .describe("Count of this week's entries rated Strong or Excellent."),
+      totalRated: zod
+        .number()
+        .describe("Total entries this week that have a rating."),
+      mix: zod.object({
         excellent: zod.number(),
         strong: zod.number(),
         steady: zod.number(),
         needs_improvement: zod.number(),
         difficult_week: zod.number(),
       }),
+      deltaStrongOrAbove: zod
+        .number()
+        .describe("Week-over-week change in the Strong-or-above count."),
     }),
-  ),
-  thisWeekSummary: zod.object({
-    totalClassLines: zod.number(),
-    avgLinesPerStudent: zod.number(),
-    bestWeekLinesThisMonth: zod.number(),
+    attendance: zod.object({
+      percentThisWeek: zod
+        .number()
+        .nullable()
+        .describe(
+          "Attendance % this week — null when no students have logged yet.",
+        ),
+      avgDaysOfFive: zod
+        .number()
+        .describe("Average days attended (out of 5) across logged students."),
+      loggedCount: zod.number(),
+      totalStudents: zod.number(),
+    }),
   }),
-  absentStudents: zod.array(
+  roster: zod.array(
     zod.object({
       studentId: zod.number(),
       name: zod.string(),
-      daysAttended: zod.number(),
+      gender: zod.enum(["male", "female"]).nullish(),
+      status: zod.enum(["concern", "watch", "fine"]),
+      juzCount: zod.number(),
+      currentPage: zod
+        .number()
+        .describe("1–604; used for the progress bar toward 30 juz."),
+      pace4Week: zod
+        .number()
+        .describe("Lines per week, averaged over the last 4 calendar weeks."),
+      paceTrend: zod
+        .enum(["up", "flat", "down"])
+        .nullish()
+        .describe(
+          "Null when there isn't enough prior data to compute a trend.",
+        ),
+      thisWeekRating: zod.string().nullish(),
+      ratingTrend: zod.enum(["up", "flat", "down"]).nullish(),
+      daysAttended: zod
+        .number()
+        .nullish()
+        .describe("Days attended this week (0–5); null when no entry yet."),
     }),
   ),
-  notYetLogged: zod.array(
-    zod.object({
-      studentId: zod.number(),
-      name: zod.string(),
+  celebrations: zod.object({
+    streaks: zod.array(
+      zod.object({
+        studentId: zod.number(),
+        name: zod.string(),
+        currentStreak: zod
+          .number()
+          .describe(
+            "Consecutive weeks of perfect (5\/5) attendance, stale-aware.",
+          ),
+        best12Week: zod
+          .number()
+          .describe("Longest perfect-attendance run in the last 12 weeks."),
+      }),
+    ),
+    milestonesThisWeek: zod.array(
+      zod.object({
+        studentId: zod.number(),
+        name: zod.string(),
+        juzNumber: zod.number(),
+        completedAt: zod
+          .string()
+          .describe("ISO timestamp when the juz was marked complete."),
+      }),
+    ),
+    classTotals: zod.object({
+      totalLinesMemorized: zod.number(),
+      totalJuzCompleted: zod.number(),
     }),
-  ),
-  classWeekStatus: zod.object({
-    thisWeekMonday: zod.string().describe("ISO date of this week's Monday."),
-    weekPhase: zod
-      .enum(["early", "mid", "late"])
-      .describe(
-        "early = Mon-Wed (not logging yet is normal), mid = Thu (gentle nudge), late = Fri+ (should escalate).",
-      ),
-    unloggedCount: zod.number(),
-    totalStudents: zod.number(),
-    allUnlogged: zod
-      .boolean()
-      .describe(
-        "True when no student has logged for this week. UI uses this to collapse per-student warnings into one class-level message.",
-      ),
   }),
 });
 
@@ -839,4 +864,12 @@ export const GetQfLinkStreakResponse = zod.object({
   connected: zod.boolean(),
   currentStreak: zod.number(),
   longestStreak: zod.number().nullish(),
+});
+
+/**
+ * @summary Get the current teacher's class
+ */
+export const GetCurrentClassResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
 });

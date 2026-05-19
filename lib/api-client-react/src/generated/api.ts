@@ -18,6 +18,7 @@ import type {
 
 import type {
   AuthResponse,
+  ClassInfo,
   ClassStats,
   CreateStudentRequest,
   DashboardStudent,
@@ -1717,6 +1718,81 @@ export function useGetQfLinkStreak<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetQfLinkStreakQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get the current teacher's class
+ */
+export const getGetCurrentClassUrl = () => {
+  return `/api/classes/current`;
+};
+
+export const getCurrentClass = async (
+  options?: RequestInit,
+): Promise<ClassInfo> => {
+  return customFetch<ClassInfo>(getGetCurrentClassUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCurrentClassQueryKey = () => {
+  return [`/api/classes/current`] as const;
+};
+
+export const getGetCurrentClassQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCurrentClass>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCurrentClass>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCurrentClassQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentClass>>> = ({
+    signal,
+  }) => getCurrentClass({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCurrentClass>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCurrentClassQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCurrentClass>>
+>;
+export type GetCurrentClassQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get the current teacher's class
+ */
+
+export function useGetCurrentClass<
+  TData = Awaited<ReturnType<typeof getCurrentClass>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCurrentClass>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCurrentClassQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

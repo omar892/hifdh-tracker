@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.3.0
  */
 
-export type RatingDistributionWeekCounts = {
+export interface RatingMix {
   excellent: number;
   strong: number;
   steady: number;
   needs_improvement: number;
   difficult_week: number;
-};
+}

@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.3.0
  */
 
-export interface StudentStreak {
+export interface StreakItem {
   studentId: number;
   name: string;
-  /** Stale-aware — returns 0 if the most-recent entry is more than 2 weeks old. */
+  /** Consecutive weeks of perfect (5/5) attendance, stale-aware. */
   currentStreak: number;
-  best12WeekStreak: number;
-  weeksSinceLastEntry?: number | null;
+  /** Longest perfect-attendance run in the last 12 weeks. */
+  best12Week: number;
 }

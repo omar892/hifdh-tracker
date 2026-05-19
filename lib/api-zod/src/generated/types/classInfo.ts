@@ -6,10 +6,7 @@
  * OpenAPI spec version: 0.3.0
  */
 
-export interface StudentProgress {
-  studentId: number;
+export interface ClassInfo {
+  id: number;
   name: string;
-  totalLines: number;
-  totalJuz: number;
-  weeklyPace: number;
 }

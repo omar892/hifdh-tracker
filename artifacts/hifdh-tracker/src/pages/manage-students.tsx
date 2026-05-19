@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useRoster, type RosterRow } from "@/hooks/use-roster";
 import type { StudentStatus } from "@/hooks/use-student-record";
 import { getGenderAvatarClass, type Gender } from "@/lib/gender-colors";
-import { formatLines } from "@/lib/format";
+import { formatLines, formatPagesDecimal } from "@/lib/format";
 import {
   Plus,
   Search,
@@ -104,7 +104,7 @@ function RosterRowView({ row }: { row: RosterRow }) {
             <span className="opacity-50">·</span>
             <span className="inline-flex items-center gap-0.5">
               <TrendingUp className="w-2.5 h-2.5" />
-              <span className="font-semibold tabular-nums">{formatLines(row.paceLast4Weeks, { short: true })}/wk</span>
+              <span className="font-semibold tabular-nums">{formatPagesDecimal(row.paceLast4Weeks)}/wk</span>
             </span>
             <span className="opacity-50">·</span>
             <span className="inline-flex items-center gap-0.5">

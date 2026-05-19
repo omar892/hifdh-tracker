@@ -171,3 +171,47 @@ export interface StudentRecordExtras {
   statusChangedAt?: string | null;
   archivedAt?: string | null;
 }
+
+// ── Per-student dashboard signals (additive on /students/:id/stats) ────────
+// The student-profile redesign reads these alongside the existing fields. All
+// optional so any code that doesn't care about the new shape keeps compiling.
+
+export type StudentVerdictTier = "needs_attention" | "watch" | "on_track";
+export type StudentTrendDir = "up" | "flat" | "down";
+
+export interface StudentVerdict {
+  tier: StudentVerdictTier;
+  sentence: string;
+  /** Internal flags that drove the tier (e.g. "stale_no_entry"). Diagnostic, not user-shown. */
+  signals: string[];
+  paceTrend: StudentTrendDir;
+  qualityTrend: StudentTrendDir;
+}
+
+export interface StudentTrajectory {
+  /** Calendar-anchored, oldest → newest, lines per week (8 weeks, zero-filled). */
+  sparkline: number[];
+  /** Avg lines/week across the last 4 weeks that have entries. */
+  linesPerWeek: number;
+  paceTrend: StudentTrendDir;
+}
+
+export interface StudentQualitySnapshot {
+  /** Newest → oldest of the last 4 rated weeks. */
+  recentRatings: { weekStartDate: string; rating: string }[];
+  qualityTrend: StudentTrendDir;
+}
+
+export interface StudentMonthlyComparison {
+  thisMonthPerWeek: number;
+  lastMonthPerWeek: number;
+  weeksLoggedThisMonth: number;
+  weeksLoggedLastMonth: number;
+}
+
+export interface StudentDashboardExtras {
+  verdict?: StudentVerdict;
+  trajectory?: StudentTrajectory;
+  quality?: StudentQualitySnapshot;
+  monthlyComparison?: StudentMonthlyComparison;
+}

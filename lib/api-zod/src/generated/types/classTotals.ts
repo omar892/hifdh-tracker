@@ -6,9 +6,7 @@
  * OpenAPI spec version: 0.3.0
  */
 
-export interface WeekTrend {
-  weekStart: string;
-  avgSuccessRate: number;
-  totalLines: number;
-  avgRating: number;
+export interface ClassTotals {
+  totalLinesMemorized: number;
+  totalJuzCompleted: number;
 }

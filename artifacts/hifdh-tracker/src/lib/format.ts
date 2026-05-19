@@ -36,6 +36,21 @@ interface FormatLinesOptions {
  * `showRemainder: false` for big-picture stats where the remainder is noise:
  *   formatLines(80, {showRemainder: false}) → "~5 pages"
  */
+/**
+ * Format a count of lines as a single decimal of pages, for rate/pace
+ * metrics. The "Xp Yℓ" split is harder to compare at a glance for rates
+ * (is "4p 8ℓ/wk" faster than "5p 2ℓ/wk"?) than a single decimal.
+ *   formatPagesDecimal(68)  → "4.5p"   (68 / 15)
+ *   formatPagesDecimal(7)   → "0.5p"
+ *   formatPagesDecimal(126) → "8.4p"
+ *   formatPagesDecimal(0)   → "0p"
+ */
+export function formatPagesDecimal(lines: number): string {
+  const pages = lines / LINES_PER_PAGE;
+  if (pages === 0) return "0p";
+  return `${pages.toFixed(1)}p`;
+}
+
 export function formatLines(n: number, opts: FormatLinesOptions = {}): string {
   const { short = false, showRemainder = true } = opts;
   // Round to int upfront — avg/pace values from the API can be floats, and

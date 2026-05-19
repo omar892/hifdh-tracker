@@ -6,11 +6,9 @@
  * OpenAPI spec version: 0.3.0
  */
 
-export interface StudentRanking {
+export interface AttentionBorderline {
   studentId: number;
   name: string;
-  compositeScore: number;
-  successRate: number;
-  weeklyPace: number;
-  consistency: number;
+  /** Why they're borderline (e.g. "attended 3/5 days"). */
+  hint: string;
 }

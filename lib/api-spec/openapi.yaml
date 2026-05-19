@@ -411,6 +411,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /classes/current:
+    get:
+      operationId: getCurrentClass
+      tags: [classes]
+      summary: Get the current teacher's class
+      responses:
+        "200":
+          description: Current class
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClassInfo"
+        "404":
+          description: No class found for current teacher
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -830,210 +849,14 @@ components:
           items:
             type: integer
 
-    NotYetLogged:
+    ClassInfo:
       type: object
-      required: [studentId, name]
+      required: [id, name]
       properties:
-        studentId:
+        id:
           type: integer
         name:
           type: string
-
-    ClassWeekStatus:
-      type: object
-      required: [thisWeekMonday, weekPhase, unloggedCount, totalStudents, allUnlogged]
-      properties:
-        thisWeekMonday:
-          type: string
-          description: ISO date of this week's Monday.
-        weekPhase:
-          type: string
-          enum: [early, mid, late]
-          description: early = Mon-Wed (not logging yet is normal), mid = Thu (gentle nudge), late = Fri+ (should escalate).
-        unloggedCount:
-          type: integer
-        totalStudents:
-          type: integer
-        allUnlogged:
-          type: boolean
-          description: True when no student has logged for this week. UI uses this to collapse per-student warnings into one class-level message.
-
-    ClassStats:
-      type: object
-      required: [totalStudents, averageSuccessRate, averageSuccessRate4Weeks, totalLinesMemorized, avgLinesPerWeek, avgLinesPerWeek4Weeks, topPerformers, needsAttention, studentProgress, studentRankings, attentionFlags, weeklyTrends, streakLeaderboard, linesThisMonth, linesLastMonth, activeStudentsThisMonth, activeStudentsLastMonth, avgLinesPerStudentThisMonth, avgLinesPerStudentLastMonth, spotlights, monthlyDecomposition, ratingDistributions, thisWeekSummary, absentStudents, notYetLogged, classWeekStatus]
-      properties:
-        totalStudents:
-          type: integer
-        averageSuccessRate:
-          type: number
-          description: All-time average success rate across students. Historical lens.
-        averageSuccessRate4Weeks:
-          type: number
-          description: Average success rate over the last 4 weeks. Only counts students who logged at least one entry in that window.
-        totalLinesMemorized:
-          type: integer
-        avgLinesPerWeek4Weeks:
-          type: number
-          description: Average lines per student per week, scoped to last 4 weeks.
-        avgLinesPerWeek:
-          type: number
-        topPerformers:
-          type: array
-          items:
-            $ref: "#/components/schemas/StudentPerformance"
-        needsAttention:
-          type: array
-          items:
-            $ref: "#/components/schemas/StudentPerformance"
-        studentProgress:
-          type: array
-          items:
-            $ref: "#/components/schemas/StudentProgress"
-        studentRankings:
-          type: array
-          items:
-            $ref: "#/components/schemas/StudentRanking"
-        attentionFlags:
-          type: array
-          items:
-            $ref: "#/components/schemas/StudentAttention"
-        weeklyTrends:
-          type: array
-          items:
-            $ref: "#/components/schemas/WeekTrend"
-        streakLeaderboard:
-          type: array
-          items:
-            $ref: "#/components/schemas/StudentStreak"
-        linesThisMonth:
-          type: integer
-        linesLastMonth:
-          type: integer
-        activeStudentsThisMonth:
-          type: integer
-        activeStudentsLastMonth:
-          type: integer
-        avgLinesPerStudentThisMonth:
-          type: number
-        avgLinesPerStudentLastMonth:
-          type: number
-        spotlights:
-          type: array
-          items:
-            $ref: "#/components/schemas/StudentSpotlight"
-        monthlyDecomposition:
-          $ref: "#/components/schemas/MonthlyDecomposition"
-        ratingDistributions:
-          type: array
-          items:
-            $ref: "#/components/schemas/RatingDistributionWeek"
-        thisWeekSummary:
-          $ref: "#/components/schemas/ThisWeekSummary"
-        absentStudents:
-          type: array
-          items:
-            $ref: "#/components/schemas/AbsentStudent"
-        notYetLogged:
-          type: array
-          items:
-            $ref: "#/components/schemas/NotYetLogged"
-        classWeekStatus:
-          $ref: "#/components/schemas/ClassWeekStatus"
-
-    StudentPerformance:
-      type: object
-      required: [studentId, name, successRate]
-      properties:
-        studentId:
-          type: integer
-        name:
-          type: string
-        successRate:
-          type: number
-
-    StudentProgress:
-      type: object
-      required: [studentId, name, totalLines, totalJuz, weeklyPace]
-      properties:
-        studentId:
-          type: integer
-        name:
-          type: string
-        totalLines:
-          type: integer
-        totalJuz:
-          type: number
-        weeklyPace:
-          type: number
-
-    StudentRanking:
-      type: object
-      required: [studentId, name, compositeScore, successRate, weeklyPace, consistency]
-      properties:
-        studentId:
-          type: integer
-        name:
-          type: string
-        compositeScore:
-          type: number
-        successRate:
-          type: number
-        weeklyPace:
-          type: number
-        consistency:
-          type: number
-
-    AttentionFlag:
-      type: object
-      required: [type, label]
-      properties:
-        type:
-          type: string
-        label:
-          type: string
-
-    StudentAttention:
-      type: object
-      required: [studentId, name, flags]
-      properties:
-        studentId:
-          type: integer
-        name:
-          type: string
-        flags:
-          type: array
-          items:
-            $ref: "#/components/schemas/AttentionFlag"
-
-    WeekTrend:
-      type: object
-      required: [weekStart, avgSuccessRate, totalLines, avgRating]
-      properties:
-        weekStart:
-          type: string
-        avgSuccessRate:
-          type: number
-        totalLines:
-          type: integer
-        avgRating:
-          type: number
-
-    StudentStreak:
-      type: object
-      required: [studentId, name, currentStreak, best12WeekStreak]
-      properties:
-        studentId:
-          type: integer
-        name:
-          type: string
-        currentStreak:
-          type: integer
-          description: Stale-aware — returns 0 if the most-recent entry is more than 2 weeks old.
-        best12WeekStreak:
-          type: integer
-        weeksSinceLastEntry:
-          type: integer
-          nullable: true
 
     Surah:
       type: object
@@ -1050,90 +873,285 @@ components:
         juz:
           type: integer
 
-    StudentSpotlight:
+    TrendDirection:
+      type: string
+      enum: [up, flat, down]
+
+    AttentionTier:
+      type: string
+      enum: [concern, watch]
+
+    AttentionFlagType:
+      type: string
+      enum: [no_entry, zero_attendance, rating_drop, rating_decline, low_pace]
+
+    AttentionItem:
       type: object
-      required: [studentId, name, insightText, type, category]
+      required: [studentId, name, tier, flagType, reason, focus, action]
       properties:
         studentId:
           type: integer
         name:
           type: string
-        insightText:
+        tier:
+          $ref: "#/components/schemas/AttentionTier"
+        flagType:
+          $ref: "#/components/schemas/AttentionFlagType"
+        reason:
           type: string
-        type:
+          description: Precise data observation in plain English ("Rating fell Strong → Steady").
+        focus:
           type: string
-          enum: [big_increase, first_excellent, personal_record, milestone_page, perfect_streak, big_drop, streak_break, rating_drop]
-        category:
+          description: Single keyword pointing at the dimension that's slipping — "Logging", "Attendance", "Review", "New material", "Recitation", or "Pace".
+        action:
           type: string
-          enum: [positive, concern]
+          description: One-sentence suggested next step, templated per flag type. Uses hifdh terminology (sabaq = new lesson, dohra = revision). Not personalized advice; the teacher decides.
 
-    MonthlyContributor:
+    AttentionBorderline:
       type: object
-      required: [studentId, name, linesDelta]
+      required: [studentId, name, hint]
       properties:
         studentId:
           type: integer
         name:
           type: string
-        linesDelta:
-          type: integer
+        hint:
+          type: string
+          description: Why they're borderline (e.g. "attended 3/5 days").
 
-    MonthlyDecomposition:
+    AttentionBlock:
       type: object
-      required: [schoolDaysThisMonth, schoolDaysLastMonth, linesPerSchoolDayThisMonth, linesPerSchoolDayLastMonth, biggestContributors]
+      required: [concern, watch, borderline]
       properties:
-        schoolDaysThisMonth:
-          type: integer
-        schoolDaysLastMonth:
-          type: integer
-        linesPerSchoolDayThisMonth:
-          type: number
-        linesPerSchoolDayLastMonth:
-          type: number
-        biggestContributors:
+        concern:
           type: array
           items:
-            $ref: "#/components/schemas/MonthlyContributor"
+            $ref: "#/components/schemas/AttentionItem"
+        watch:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttentionItem"
+        borderline:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttentionBorderline"
 
-    RatingDistributionWeek:
+    WeekRange:
       type: object
-      required: [weekStart, counts]
+      required: [weekStartDate, weekEndDate]
       properties:
-        weekStart:
+        weekStartDate:
           type: string
-        counts:
-          type: object
-          required: [excellent, strong, steady, needs_improvement, difficult_week]
-          properties:
-            excellent:
-              type: integer
-            strong:
-              type: integer
-            steady:
-              type: integer
-            needs_improvement:
-              type: integer
-            difficult_week:
-              type: integer
+          description: ISO date of this week's Monday.
+        weekEndDate:
+          type: string
+          description: ISO date of this week's Friday.
 
-    ThisWeekSummary:
+    Verdict:
       type: object
-      required: [totalClassLines, avgLinesPerStudent, bestWeekLinesThisMonth]
+      required: [paceTrend, qualityTrend, concernCount, watchCount, mostUrgentName, sentence]
       properties:
-        totalClassLines:
+        paceTrend:
+          $ref: "#/components/schemas/TrendDirection"
+        qualityTrend:
+          $ref: "#/components/schemas/TrendDirection"
+        concernCount:
           type: integer
-        avgLinesPerStudent:
+        watchCount:
+          type: integer
+        mostUrgentName:
+          type: string
+          nullable: true
+        sentence:
+          type: string
+          description: One-sentence narrative summary composed server-side from the trends and flag counts.
+
+    PaceCard:
+      type: object
+      required: [thisWeek, avg4Week, delta, sparkline]
+      properties:
+        thisWeek:
           type: number
-        bestWeekLinesThisMonth:
+          description: Lines per student this week.
+        avg4Week:
+          type: number
+          description: Lines per student per week, averaged over the last 4 calendar weeks.
+        delta:
+          type: number
+          description: thisWeek minus avg4Week.
+        sparkline:
+          type: array
+          description: 8-week sparkline (oldest → newest) of lines per student per week.
+          items:
+            type: number
+
+    RatingMix:
+      type: object
+      required: [excellent, strong, steady, needs_improvement, difficult_week]
+      properties:
+        excellent:
+          type: integer
+        strong:
+          type: integer
+        steady:
+          type: integer
+        needs_improvement:
+          type: integer
+        difficult_week:
           type: integer
 
-    AbsentStudent:
+    QualityCard:
       type: object
-      required: [studentId, name, daysAttended]
+      required: [strongOrAbove, totalRated, mix, deltaStrongOrAbove]
+      properties:
+        strongOrAbove:
+          type: integer
+          description: Count of this week's entries rated Strong or Excellent.
+        totalRated:
+          type: integer
+          description: Total entries this week that have a rating.
+        mix:
+          $ref: "#/components/schemas/RatingMix"
+        deltaStrongOrAbove:
+          type: integer
+          description: Week-over-week change in the Strong-or-above count.
+
+    AttendanceCard:
+      type: object
+      required: [percentThisWeek, avgDaysOfFive, loggedCount, totalStudents]
+      properties:
+        percentThisWeek:
+          type: integer
+          nullable: true
+          description: Attendance % this week — null when no students have logged yet.
+        avgDaysOfFive:
+          type: number
+          description: Average days attended (out of 5) across logged students.
+        loggedCount:
+          type: integer
+        totalStudents:
+          type: integer
+
+    ClassPulse:
+      type: object
+      required: [pace, quality, attendance]
+      properties:
+        pace:
+          $ref: "#/components/schemas/PaceCard"
+        quality:
+          $ref: "#/components/schemas/QualityCard"
+        attendance:
+          $ref: "#/components/schemas/AttendanceCard"
+
+    RosterStatus:
+      type: string
+      enum: [concern, watch, fine]
+
+    RosterRow:
+      type: object
+      required: [studentId, name, status, juzCount, currentPage, pace4Week]
       properties:
         studentId:
           type: integer
         name:
           type: string
+        gender:
+          type: string
+          nullable: true
+          enum: [male, female]
+        status:
+          $ref: "#/components/schemas/RosterStatus"
+        juzCount:
+          type: integer
+        currentPage:
+          type: integer
+          description: 1–604; used for the progress bar toward 30 juz.
+        pace4Week:
+          type: number
+          description: Lines per week, averaged over the last 4 calendar weeks.
+        paceTrend:
+          allOf: [{ $ref: "#/components/schemas/TrendDirection" }]
+          nullable: true
+          description: Null when there isn't enough prior data to compute a trend.
+        thisWeekRating:
+          type: string
+          nullable: true
+        ratingTrend:
+          allOf: [{ $ref: "#/components/schemas/TrendDirection" }]
+          nullable: true
         daysAttended:
           type: integer
+          nullable: true
+          description: Days attended this week (0–5); null when no entry yet.
+
+    StreakItem:
+      type: object
+      required: [studentId, name, currentStreak, best12Week]
+      properties:
+        studentId:
+          type: integer
+        name:
+          type: string
+        currentStreak:
+          type: integer
+          description: Consecutive weeks of perfect (5/5) attendance, stale-aware.
+        best12Week:
+          type: integer
+          description: Longest perfect-attendance run in the last 12 weeks.
+
+    MilestoneItem:
+      type: object
+      required: [studentId, name, juzNumber, completedAt]
+      properties:
+        studentId:
+          type: integer
+        name:
+          type: string
+        juzNumber:
+          type: integer
+        completedAt:
+          type: string
+          description: ISO timestamp when the juz was marked complete.
+
+    ClassTotals:
+      type: object
+      required: [totalLinesMemorized, totalJuzCompleted]
+      properties:
+        totalLinesMemorized:
+          type: integer
+        totalJuzCompleted:
+          type: integer
+
+    Celebrations:
+      type: object
+      required: [streaks, milestonesThisWeek, classTotals]
+      properties:
+        streaks:
+          type: array
+          items:
+            $ref: "#/components/schemas/StreakItem"
+        milestonesThisWeek:
+          type: array
+          items:
+            $ref: "#/components/schemas/MilestoneItem"
+        classTotals:
+          $ref: "#/components/schemas/ClassTotals"
+
+    ClassStats:
+      type: object
+      required: [weekRange, verdict, attention, classPulse, roster, celebrations]
+      properties:
+        weekRange:
+          $ref: "#/components/schemas/WeekRange"
+        verdict:
+          $ref: "#/components/schemas/Verdict"
+        attention:
+          $ref: "#/components/schemas/AttentionBlock"
+        classPulse:
+          $ref: "#/components/schemas/ClassPulse"
+        roster:
+          type: array
+          items:
+            $ref: "#/components/schemas/RosterRow"
+        celebrations:
+          $ref: "#/components/schemas/Celebrations"

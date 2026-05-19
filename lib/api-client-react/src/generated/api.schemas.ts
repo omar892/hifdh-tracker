@@ -285,183 +285,9 @@ export interface DashboardStudent {
   completedJuz: number[];
 }
 
-export interface NotYetLogged {
-  studentId: number;
+export interface ClassInfo {
+  id: number;
   name: string;
-}
-
-/**
- * early = Mon-Wed (not logging yet is normal), mid = Thu (gentle nudge), late = Fri+ (should escalate).
- */
-export type ClassWeekStatusWeekPhase =
-  (typeof ClassWeekStatusWeekPhase)[keyof typeof ClassWeekStatusWeekPhase];
-
-export const ClassWeekStatusWeekPhase = {
-  early: "early",
-  mid: "mid",
-  late: "late",
-} as const;
-
-export interface ClassWeekStatus {
-  /** ISO date of this week's Monday. */
-  thisWeekMonday: string;
-  /** early = Mon-Wed (not logging yet is normal), mid = Thu (gentle nudge), late = Fri+ (should escalate). */
-  weekPhase: ClassWeekStatusWeekPhase;
-  unloggedCount: number;
-  totalStudents: number;
-  /** True when no student has logged for this week. UI uses this to collapse per-student warnings into one class-level message. */
-  allUnlogged: boolean;
-}
-
-export interface StudentPerformance {
-  studentId: number;
-  name: string;
-  successRate: number;
-}
-
-export interface StudentProgress {
-  studentId: number;
-  name: string;
-  totalLines: number;
-  totalJuz: number;
-  weeklyPace: number;
-}
-
-export interface StudentRanking {
-  studentId: number;
-  name: string;
-  compositeScore: number;
-  successRate: number;
-  weeklyPace: number;
-  consistency: number;
-}
-
-export interface AttentionFlag {
-  type: string;
-  label: string;
-}
-
-export interface StudentAttention {
-  studentId: number;
-  name: string;
-  flags: AttentionFlag[];
-}
-
-export interface WeekTrend {
-  weekStart: string;
-  avgSuccessRate: number;
-  totalLines: number;
-  avgRating: number;
-}
-
-export interface StudentStreak {
-  studentId: number;
-  name: string;
-  /** Stale-aware — returns 0 if the most-recent entry is more than 2 weeks old. */
-  currentStreak: number;
-  best12WeekStreak: number;
-  weeksSinceLastEntry?: number | null;
-}
-
-export type StudentSpotlightType =
-  (typeof StudentSpotlightType)[keyof typeof StudentSpotlightType];
-
-export const StudentSpotlightType = {
-  big_increase: "big_increase",
-  first_excellent: "first_excellent",
-  personal_record: "personal_record",
-  milestone_page: "milestone_page",
-  perfect_streak: "perfect_streak",
-  big_drop: "big_drop",
-  streak_break: "streak_break",
-  rating_drop: "rating_drop",
-} as const;
-
-export type StudentSpotlightCategory =
-  (typeof StudentSpotlightCategory)[keyof typeof StudentSpotlightCategory];
-
-export const StudentSpotlightCategory = {
-  positive: "positive",
-  concern: "concern",
-} as const;
-
-export interface StudentSpotlight {
-  studentId: number;
-  name: string;
-  insightText: string;
-  type: StudentSpotlightType;
-  category: StudentSpotlightCategory;
-}
-
-export interface MonthlyContributor {
-  studentId: number;
-  name: string;
-  linesDelta: number;
-}
-
-export interface MonthlyDecomposition {
-  schoolDaysThisMonth: number;
-  schoolDaysLastMonth: number;
-  linesPerSchoolDayThisMonth: number;
-  linesPerSchoolDayLastMonth: number;
-  biggestContributors: MonthlyContributor[];
-}
-
-export type RatingDistributionWeekCounts = {
-  excellent: number;
-  strong: number;
-  steady: number;
-  needs_improvement: number;
-  difficult_week: number;
-};
-
-export interface RatingDistributionWeek {
-  weekStart: string;
-  counts: RatingDistributionWeekCounts;
-}
-
-export interface ThisWeekSummary {
-  totalClassLines: number;
-  avgLinesPerStudent: number;
-  bestWeekLinesThisMonth: number;
-}
-
-export interface AbsentStudent {
-  studentId: number;
-  name: string;
-  daysAttended: number;
-}
-
-export interface ClassStats {
-  totalStudents: number;
-  /** All-time average success rate across students. Historical lens. */
-  averageSuccessRate: number;
-  /** Average success rate over the last 4 weeks. Only counts students who logged at least one entry in that window. */
-  averageSuccessRate4Weeks: number;
-  totalLinesMemorized: number;
-  /** Average lines per student per week, scoped to last 4 weeks. */
-  avgLinesPerWeek4Weeks: number;
-  avgLinesPerWeek: number;
-  topPerformers: StudentPerformance[];
-  needsAttention: StudentPerformance[];
-  studentProgress: StudentProgress[];
-  studentRankings: StudentRanking[];
-  attentionFlags: StudentAttention[];
-  weeklyTrends: WeekTrend[];
-  streakLeaderboard: StudentStreak[];
-  linesThisMonth: number;
-  linesLastMonth: number;
-  activeStudentsThisMonth: number;
-  activeStudentsLastMonth: number;
-  avgLinesPerStudentThisMonth: number;
-  avgLinesPerStudentLastMonth: number;
-  spotlights: StudentSpotlight[];
-  monthlyDecomposition: MonthlyDecomposition;
-  ratingDistributions: RatingDistributionWeek[];
-  thisWeekSummary: ThisWeekSummary;
-  absentStudents: AbsentStudent[];
-  notYetLogged: NotYetLogged[];
-  classWeekStatus: ClassWeekStatus;
 }
 
 export interface Surah {
@@ -470,6 +296,192 @@ export interface Surah {
   nameArabic: string;
   ayahCount: number;
   juz: number;
+}
+
+export type TrendDirection =
+  (typeof TrendDirection)[keyof typeof TrendDirection];
+
+export const TrendDirection = {
+  up: "up",
+  flat: "flat",
+  down: "down",
+} as const;
+
+export type AttentionTier = (typeof AttentionTier)[keyof typeof AttentionTier];
+
+export const AttentionTier = {
+  concern: "concern",
+  watch: "watch",
+} as const;
+
+export type AttentionFlagType =
+  (typeof AttentionFlagType)[keyof typeof AttentionFlagType];
+
+export const AttentionFlagType = {
+  no_entry: "no_entry",
+  zero_attendance: "zero_attendance",
+  rating_drop: "rating_drop",
+  rating_decline: "rating_decline",
+  low_pace: "low_pace",
+} as const;
+
+export interface AttentionItem {
+  studentId: number;
+  name: string;
+  tier: AttentionTier;
+  flagType: AttentionFlagType;
+  /** Precise data observation in plain English ("Rating fell Strong → Steady"). */
+  reason: string;
+  /** Single keyword pointing at the dimension that's slipping — "Logging", "Attendance", "Review", "New material", "Recitation", or "Pace". */
+  focus: string;
+  /** One-sentence suggested next step, templated per flag type. Uses hifdh terminology (sabaq = new lesson, dohra = revision). Not personalized advice; the teacher decides. */
+  action: string;
+}
+
+export interface AttentionBorderline {
+  studentId: number;
+  name: string;
+  /** Why they're borderline (e.g. "attended 3/5 days"). */
+  hint: string;
+}
+
+export interface AttentionBlock {
+  concern: AttentionItem[];
+  watch: AttentionItem[];
+  borderline: AttentionBorderline[];
+}
+
+export interface WeekRange {
+  /** ISO date of this week's Monday. */
+  weekStartDate: string;
+  /** ISO date of this week's Friday. */
+  weekEndDate: string;
+}
+
+export interface Verdict {
+  paceTrend: TrendDirection;
+  qualityTrend: TrendDirection;
+  concernCount: number;
+  watchCount: number;
+  mostUrgentName: string | null;
+  /** One-sentence narrative summary composed server-side from the trends and flag counts. */
+  sentence: string;
+}
+
+export interface PaceCard {
+  /** Lines per student this week. */
+  thisWeek: number;
+  /** Lines per student per week, averaged over the last 4 calendar weeks. */
+  avg4Week: number;
+  /** thisWeek minus avg4Week. */
+  delta: number;
+  /** 8-week sparkline (oldest → newest) of lines per student per week. */
+  sparkline: number[];
+}
+
+export interface RatingMix {
+  excellent: number;
+  strong: number;
+  steady: number;
+  needs_improvement: number;
+  difficult_week: number;
+}
+
+export interface QualityCard {
+  /** Count of this week's entries rated Strong or Excellent. */
+  strongOrAbove: number;
+  /** Total entries this week that have a rating. */
+  totalRated: number;
+  mix: RatingMix;
+  /** Week-over-week change in the Strong-or-above count. */
+  deltaStrongOrAbove: number;
+}
+
+export interface AttendanceCard {
+  /** Attendance % this week — null when no students have logged yet. */
+  percentThisWeek: number | null;
+  /** Average days attended (out of 5) across logged students. */
+  avgDaysOfFive: number;
+  loggedCount: number;
+  totalStudents: number;
+}
+
+export interface ClassPulse {
+  pace: PaceCard;
+  quality: QualityCard;
+  attendance: AttendanceCard;
+}
+
+export type RosterStatus = (typeof RosterStatus)[keyof typeof RosterStatus];
+
+export const RosterStatus = {
+  concern: "concern",
+  watch: "watch",
+  fine: "fine",
+} as const;
+
+export type RosterRowGender =
+  | (typeof RosterRowGender)[keyof typeof RosterRowGender]
+  | null;
+
+export const RosterRowGender = {
+  male: "male",
+  female: "female",
+} as const;
+
+export interface RosterRow {
+  studentId: number;
+  name: string;
+  gender?: RosterRowGender;
+  status: RosterStatus;
+  juzCount: number;
+  /** 1–604; used for the progress bar toward 30 juz. */
+  currentPage: number;
+  /** Lines per week, averaged over the last 4 calendar weeks. */
+  pace4Week: number;
+  /** Null when there isn't enough prior data to compute a trend. */
+  paceTrend?: TrendDirection | null;
+  thisWeekRating?: string | null;
+  ratingTrend?: TrendDirection | null;
+  /** Days attended this week (0–5); null when no entry yet. */
+  daysAttended?: number | null;
+}
+
+export interface StreakItem {
+  studentId: number;
+  name: string;
+  /** Consecutive weeks of perfect (5/5) attendance, stale-aware. */
+  currentStreak: number;
+  /** Longest perfect-attendance run in the last 12 weeks. */
+  best12Week: number;
+}
+
+export interface MilestoneItem {
+  studentId: number;
+  name: string;
+  juzNumber: number;
+  /** ISO timestamp when the juz was marked complete. */
+  completedAt: string;
+}
+
+export interface ClassTotals {
+  totalLinesMemorized: number;
+  totalJuzCompleted: number;
+}
+
+export interface Celebrations {
+  streaks: StreakItem[];
+  milestonesThisWeek: MilestoneItem[];
+  classTotals: ClassTotals;
+}
+
+export interface ClassStats {
+  weekRange: WeekRange;
+  verdict: Verdict;
+  attention: AttentionBlock;
+  classPulse: ClassPulse;
+  roster: RosterRow[];
+  celebrations: Celebrations;
 }
 
 export type ListStudentsParams = {

@@ -6,8 +6,10 @@
  * OpenAPI spec version: 0.3.0
  */
 
-export interface StudentPerformance {
+export interface MilestoneItem {
   studentId: number;
   name: string;
-  successRate: number;
+  juzNumber: number;
+  /** ISO timestamp when the juz was marked complete. */
+  completedAt: string;
 }

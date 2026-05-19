@@ -10,6 +10,7 @@ import guardiansRouter from "./guardians";
 import viewerAccessRouter from "./viewer-access";
 import rosterRouter from "./roster";
 import qfLinkRouter from "./qf-link";
+import classesRouter from "./classes";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(guardiansRouter);
 router.use(viewerAccessRouter);
 router.use(rosterRouter);
 router.use(qfLinkRouter);
+router.use(classesRouter);
 
 export default router;

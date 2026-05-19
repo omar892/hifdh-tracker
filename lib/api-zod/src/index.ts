@@ -14,7 +14,6 @@ export type {
   MessageResponse,
   Student,
   StudentCalendar,
-  StudentPerformance,
   StudentStats,
   Surah,
   UpdateStudentRequest,
