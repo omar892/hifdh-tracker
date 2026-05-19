@@ -3,7 +3,7 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { useGetDashboard, useGetQfLinkStatus, useGetQfLinkStreak, getGetQfLinkStreakQueryKey } from "@workspace/api-client-react";
 import { Link, useLocation } from "wouter";
 import { format, startOfWeek, addDays, getDay } from "date-fns";
-import { CheckCircle2, Clock, BookOpen, Play, Pencil, AlertCircle, Flame } from "lucide-react";
+import { CheckCircle2, Clock, BookOpen, Play, Pencil, AlertCircle, Flame, Pause } from "lucide-react";
 import { TOTAL_PAGES, getLinesForCompletedJuz, TOTAL_LINES } from "@/lib/quran-utils";
 import { formatLines } from "@/lib/format";
 import { getGenderAvatarClass, getGenderBorderClass, type Gender } from "@/lib/gender-colors";
@@ -94,8 +94,12 @@ export default function Dashboard() {
   const weekEnd = addDays(weekStart, 4);
   const weekRange = `${format(weekStart, "MMM d")} \u2013 ${format(weekEnd, "MMM d")}`;
 
-  const doneCount = students?.filter((s) => s.thisWeekDone).length ?? 0;
-  const totalCount = students?.length ?? 0;
+  // Paused students don't count toward "X/Y logged" — they're not expected
+  // to log, so including them would always show a partial number. Same for
+  // "all unlogged" alerts.
+  const expectingStudents = students?.filter((s) => (s as { status?: string }).status !== "paused") ?? [];
+  const doneCount = expectingStudents.filter((s) => s.thisWeekDone).length;
+  const totalCount = expectingStudents.length;
   const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
   const weekPhase = getWeekPhase();
   const allUnlogged = totalCount > 0 && doneCount === 0;
@@ -221,11 +225,13 @@ export default function Dashboard() {
                   className="block group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl"
                 >
                   <div className={`bg-card rounded-2xl p-4 border hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 h-full flex flex-col relative overflow-hidden ${getGenderBorderClass(student.gender as Gender)} ${
-                    student.thisWeekDone
-                      ? "border-emerald-300/60 dark:border-emerald-700/40"
-                      : "border-border/50"
+                    (student as { status?: string }).status === "paused"
+                      ? "opacity-70 border-amber-300/30 dark:border-amber-700/30"
+                      : student.thisWeekDone
+                        ? "border-emerald-300/60 dark:border-emerald-700/40"
+                        : "border-border/50"
                   }`}>
-                    {student.thisWeekDone && (
+                    {student.thisWeekDone && (student as { status?: string }).status !== "paused" && (
                       <div className="absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -mr-8 -mt-8 bg-emerald-500/8 pointer-events-none" />
                     )}
 
@@ -240,8 +246,15 @@ export default function Dashboard() {
                       the name gets the full card width. The colored icon (green
                       check / amber alert / gray clock) carries the signal; the
                       "Log this week" / "Edit entry" button below restates it.
+                      Paused students bypass the missing/notyet ladder — they're
+                      not expected to log, so we show a calm pause icon instead
+                      of an alarm.
                     */}
-                    {student.thisWeekDone ? (
+                    {(student as { status?: string }).status === "paused" ? (
+                      <span aria-label="Paused" title="Paused" className="absolute top-3 right-3 z-20 w-5 h-5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 flex items-center justify-center">
+                        <Pause className="w-3 h-3" />
+                      </span>
+                    ) : student.thisWeekDone ? (
                       <span aria-label="Done" title="Done" className="absolute top-3 right-3 z-20 w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                       </span>

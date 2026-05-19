@@ -285,10 +285,20 @@ router.get("/students/:studentId/calendar", requireAuth, async (req, res) => {
 
 router.get("/dashboard", requireAuth, async (req, res) => {
   const teacher = req.teacher!;
+  // Dashboard shows active AND paused students — paused stay visible so the
+  // teacher can change their mind / unpause / log a make-up week, but the
+  // frontend uses `status` to render them with calm styling and to suppress
+  // "Missing" alerts. Graduated + withdrawn are filtered out entirely (the
+  // roster's Archived view is their home).
   const students = await db
     .select()
     .from(studentsTable)
-    .where(and(eq(studentsTable.teacherId, teacher.id), eq(studentsTable.active, true)));
+    .where(
+      and(
+        eq(studentsTable.teacherId, teacher.id),
+        inArray(studentsTable.status, ["active", "paused"]),
+      ),
+    );
 
   const thisWeekMonday = getCurrentMonday();
 
@@ -311,6 +321,7 @@ router.get("/dashboard", requireAuth, async (req, res) => {
         currentPage: student.currentPage,
         currentLine: student.currentLine,
         active: student.active,
+        status: student.status,
         thisWeekDone,
         thisWeekEntry: thisWeekDone ? latestEntry : null,
         completedJuz,
@@ -576,10 +587,18 @@ function computeSpotlights(
 
 router.get("/stats/class", requireAuth, async (req, res) => {
   const teacher = req.teacher!;
+  // Class averages reflect ACTIVE students only — paused students should not
+  // pull down the success rate or pace because their lack of recent entries
+  // is by design, not a problem. Graduated / withdrawn are also excluded.
   const students = await db
     .select()
     .from(studentsTable)
-    .where(and(eq(studentsTable.teacherId, teacher.id), eq(studentsTable.active, true)));
+    .where(
+      and(
+        eq(studentsTable.teacherId, teacher.id),
+        eq(studentsTable.status, "active"),
+      ),
+    );
   // Scope entries to only this teacher's students. Avoids leaking another
   // teacher's data through aggregates (mean lines/week, success rate, etc.).
   const studentIds = students.map((s) => s.id);
