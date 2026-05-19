@@ -18,7 +18,7 @@ export const weeklyEntriesTable = pgTable("weekly_entries", {
   currentLine: integer("current_line"),
 
   // Daily pass/fail arrays (JSON text: [true,true,false,true,true])
-  dailySabaq: text("daily_sabaq"),
+  dailyMemorization: text("daily_memorization"),
   dailyRmv: text("daily_rmv"),
   dailyReview: text("daily_review"),
   dailyAbsent: text("daily_absent"),

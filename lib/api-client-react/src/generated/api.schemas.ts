@@ -25,6 +25,18 @@ export interface AuthResponse {
   authenticated: boolean;
 }
 
+export interface QfLinkStatus {
+  connected: boolean;
+  displayName?: string | null;
+  connectedAt?: string;
+}
+
+export interface QfLinkStreak {
+  connected: boolean;
+  currentStreak: number;
+  longestStreak?: number | null;
+}
+
 export type MushafPreference =
   (typeof MushafPreference)[keyof typeof MushafPreference];
 
@@ -153,7 +165,7 @@ export interface WeeklyEntry {
   memorizationLines: number;
   currentPage?: number | null;
   currentLine?: number | null;
-  dailySabaq?: BoolArray5 | null;
+  dailyMemorization?: BoolArray5 | null;
   dailyRmv?: BoolArray5 | null;
   dailyReview?: BoolArray5 | null;
   dailyAbsent?: BoolArray5 | null;
@@ -181,7 +193,7 @@ export interface UpsertWeeklyEntryRequest {
    * @maximum 15
    */
   currentLine?: number | null;
-  dailySabaq: BoolArray5;
+  dailyMemorization: BoolArray5;
   dailyRmv: BoolArray5;
   dailyReview: BoolArray5;
   dailyAbsent: BoolArray5;

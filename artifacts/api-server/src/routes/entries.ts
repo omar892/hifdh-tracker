@@ -11,6 +11,7 @@ import {
 import { requireAuth } from "../middlewares/auth";
 import { getJuzForPage } from "../lib/quran-data";
 import { enrichLogEntry } from "../lib/quran/lookup";
+import { markActivityDayForProgram } from "../lib/quran/user-actions";
 import { getCompletedJuz } from "./students";
 import { getStudentForTeacher } from "../lib/scope";
 
@@ -44,7 +45,7 @@ function parseDailyArray(raw: string | null): boolean[] {
 function serializeEntry(entry: typeof weeklyEntriesTable.$inferSelect) {
   return {
     ...entry,
-    dailySabaq: parseDailyArray(entry.dailySabaq),
+    dailyMemorization: parseDailyArray(entry.dailyMemorization),
     dailyRmv: parseDailyArray(entry.dailyRmv),
     dailyReview: parseDailyArray(entry.dailyReview),
     dailyAbsent: parseDailyArray(entry.dailyAbsent),
@@ -122,7 +123,7 @@ router.put("/students/:studentId/entries/weekly/:weekStart", requireAuth, async 
   const memorizationLines = body.memorizationLines ?? 0;
 
   // Compute from daily arrays
-  const sabaq = body.dailySabaq;
+  const memorization = body.dailyMemorization;
   const rmv = body.dailyRmv;
   const review = body.dailyReview;
   const absent = body.dailyAbsent;
@@ -135,7 +136,7 @@ router.put("/students/:studentId/entries/weekly/:weekStart", requireAuth, async 
     if (absent[i]) continue;
     daysAttended++;
     let dayPoints = 0;
-    if (sabaq[i]) { weeklyPoints++; dayPoints++; }
+    if (memorization[i]) { weeklyPoints++; dayPoints++; }
     if (rmv[i]) { weeklyPoints++; dayPoints++; }
     if (review[i]) { weeklyPoints++; dayPoints++; }
     if (dayPoints === 3) successfulDays++;
@@ -149,7 +150,7 @@ router.put("/students/:studentId/entries/weekly/:weekStart", requireAuth, async 
     memorizationLines,
     currentPage: body.currentPage ?? null,
     currentLine: body.currentLine ?? null,
-    dailySabaq: JSON.stringify(sabaq),
+    dailyMemorization: JSON.stringify(memorization),
     dailyRmv: JSON.stringify(rmv),
     dailyReview: JSON.stringify(review),
     dailyAbsent: JSON.stringify(absent),
@@ -246,6 +247,11 @@ router.put("/students/:studentId/entries/weekly/:weekStart", requireAuth, async 
   }
 
   res.json({ ...serializeEntry(entry), coverage });
+
+  // Fire-and-forget: mark today's Activity Day on the linked QF account so
+  // the program's streak reflects continuous teaching activity. Idempotent
+  // within a UTC day, swallows all errors — must never fail the save.
+  void markActivityDayForProgram(teacher.programId);
   } catch (err) { next(err); }
 });
 

@@ -1,9 +1,9 @@
 import { useProtectedRoute } from "@/hooks/use-auth";
 import { AppLayout } from "@/components/layout/app-layout";
-import { useGetDashboard } from "@workspace/api-client-react";
+import { useGetDashboard, useGetQfLinkStatus, useGetQfLinkStreak, getGetQfLinkStreakQueryKey } from "@workspace/api-client-react";
 import { Link, useLocation } from "wouter";
 import { format, startOfWeek, addDays, getDay } from "date-fns";
-import { CheckCircle2, Clock, BookOpen, Play, Pencil, AlertCircle } from "lucide-react";
+import { CheckCircle2, Clock, BookOpen, Play, Pencil, AlertCircle, Flame } from "lucide-react";
 import { TOTAL_PAGES, getLinesForCompletedJuz, TOTAL_LINES } from "@/lib/quran-utils";
 import { formatLines } from "@/lib/format";
 import { getGenderAvatarClass, getGenderBorderClass, type Gender } from "@/lib/gender-colors";
@@ -15,6 +15,32 @@ function getWeekPhase(): "early" | "mid" | "late" | "weekend" {
   if (d === 5) return "late"; // Friday — last chance to log live
   if (d === 4) return "mid"; // Thursday
   return "early"; // Mon–Wed
+}
+
+/**
+ * Tiny chip showing the program's current QF streak. Renders only when the
+ * admin has linked a Quran.com account (otherwise stays invisible — the
+ * Settings page is the discovery surface for connecting).
+ */
+function ProgramStreakChip() {
+  const { data: status } = useGetQfLinkStatus();
+  const { data: streak } = useGetQfLinkStreak({
+    query: { enabled: !!status?.connected, queryKey: getGetQfLinkStreakQueryKey() },
+  });
+  if (!status?.connected || !streak?.currentStreak) return null;
+  return (
+    <Link href="/settings" className="block">
+      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/15 transition-colors">
+        <Flame className="w-3 h-3" />
+        <span className="text-[11px] font-extrabold tabular-nums">
+          {streak.currentStreak}
+        </span>
+        <span className="text-[9px] uppercase tracking-widest font-bold opacity-70">
+          day streak
+        </span>
+      </div>
+    </Link>
+  );
 }
 
 function WeekDots() {
@@ -78,9 +104,10 @@ export default function Dashboard() {
     <AppLayout title="Dashboard">
       {/* Hero header */}
       <div className="mb-8">
-        <div className="flex items-center gap-2.5 mb-2">
+        <div className="flex items-center gap-2.5 mb-2 flex-wrap">
           <p className="text-[11px] font-extrabold tracking-widest text-primary uppercase">{weekRange}</p>
           <WeekDots />
+          <ProgramStreakChip />
         </div>
         <h1 className="font-display text-3xl md:text-4xl font-extrabold text-foreground tracking-tight leading-none">
           Student Overview

@@ -213,8 +213,8 @@ export const ListWeeklyEntriesQueryParams = zod.object({
   offset: zod.coerce.number().default(listWeeklyEntriesQueryOffsetDefault),
 });
 
-export const listWeeklyEntriesResponseDailySabaqMin = 5;
-export const listWeeklyEntriesResponseDailySabaqMax = 5;
+export const listWeeklyEntriesResponseDailyMemorizationMin = 5;
+export const listWeeklyEntriesResponseDailyMemorizationMax = 5;
 
 export const listWeeklyEntriesResponseDailyRmvMin = 5;
 export const listWeeklyEntriesResponseDailyRmvMax = 5;
@@ -233,10 +233,10 @@ export const ListWeeklyEntriesResponseItem = zod.object({
   memorizationLines: zod.number(),
   currentPage: zod.number().nullish(),
   currentLine: zod.number().nullish(),
-  dailySabaq: zod
+  dailyMemorization: zod
     .array(zod.boolean())
-    .min(listWeeklyEntriesResponseDailySabaqMin)
-    .max(listWeeklyEntriesResponseDailySabaqMax)
+    .min(listWeeklyEntriesResponseDailyMemorizationMin)
+    .max(listWeeklyEntriesResponseDailyMemorizationMax)
     .nullish(),
   dailyRmv: zod
     .array(zod.boolean())
@@ -283,8 +283,8 @@ export const GetWeeklyEntryParams = zod.object({
   weekStart: zod.coerce.string().describe("Monday date (YYYY-MM-DD)"),
 });
 
-export const getWeeklyEntryResponseDailySabaqMin = 5;
-export const getWeeklyEntryResponseDailySabaqMax = 5;
+export const getWeeklyEntryResponseDailyMemorizationMin = 5;
+export const getWeeklyEntryResponseDailyMemorizationMax = 5;
 
 export const getWeeklyEntryResponseDailyRmvMin = 5;
 export const getWeeklyEntryResponseDailyRmvMax = 5;
@@ -303,10 +303,10 @@ export const GetWeeklyEntryResponse = zod.object({
   memorizationLines: zod.number(),
   currentPage: zod.number().nullish(),
   currentLine: zod.number().nullish(),
-  dailySabaq: zod
+  dailyMemorization: zod
     .array(zod.boolean())
-    .min(getWeeklyEntryResponseDailySabaqMin)
-    .max(getWeeklyEntryResponseDailySabaqMax)
+    .min(getWeeklyEntryResponseDailyMemorizationMin)
+    .max(getWeeklyEntryResponseDailyMemorizationMax)
     .nullish(),
   dailyRmv: zod
     .array(zod.boolean())
@@ -356,8 +356,8 @@ export const upsertWeeklyEntryBodyCurrentPageMax = 604;
 
 export const upsertWeeklyEntryBodyCurrentLineMax = 15;
 
-export const upsertWeeklyEntryBodyDailySabaqMin = 5;
-export const upsertWeeklyEntryBodyDailySabaqMax = 5;
+export const upsertWeeklyEntryBodyDailyMemorizationMin = 5;
+export const upsertWeeklyEntryBodyDailyMemorizationMax = 5;
 
 export const upsertWeeklyEntryBodyDailyRmvMin = 5;
 export const upsertWeeklyEntryBodyDailyRmvMax = 5;
@@ -383,10 +383,10 @@ export const UpsertWeeklyEntryBody = zod.object({
     .min(1)
     .max(upsertWeeklyEntryBodyCurrentLineMax)
     .nullish(),
-  dailySabaq: zod
+  dailyMemorization: zod
     .array(zod.boolean())
-    .min(upsertWeeklyEntryBodyDailySabaqMin)
-    .max(upsertWeeklyEntryBodyDailySabaqMax),
+    .min(upsertWeeklyEntryBodyDailyMemorizationMin)
+    .max(upsertWeeklyEntryBodyDailyMemorizationMax),
   dailyRmv: zod
     .array(zod.boolean())
     .min(upsertWeeklyEntryBodyDailyRmvMin)
@@ -413,8 +413,8 @@ export const UpsertWeeklyEntryBody = zod.object({
   teacherNotes: zod.string().nullish(),
 });
 
-export const upsertWeeklyEntryResponseDailySabaqMin = 5;
-export const upsertWeeklyEntryResponseDailySabaqMax = 5;
+export const upsertWeeklyEntryResponseDailyMemorizationMin = 5;
+export const upsertWeeklyEntryResponseDailyMemorizationMax = 5;
 
 export const upsertWeeklyEntryResponseDailyRmvMin = 5;
 export const upsertWeeklyEntryResponseDailyRmvMax = 5;
@@ -433,10 +433,10 @@ export const UpsertWeeklyEntryResponse = zod.object({
   memorizationLines: zod.number(),
   currentPage: zod.number().nullish(),
   currentLine: zod.number().nullish(),
-  dailySabaq: zod
+  dailyMemorization: zod
     .array(zod.boolean())
-    .min(upsertWeeklyEntryResponseDailySabaqMin)
-    .max(upsertWeeklyEntryResponseDailySabaqMax)
+    .min(upsertWeeklyEntryResponseDailyMemorizationMin)
+    .max(upsertWeeklyEntryResponseDailyMemorizationMax)
     .nullish(),
   dailyRmv: zod
     .array(zod.boolean())
@@ -569,8 +569,8 @@ export const GetStudentCalendarResponse = zod.object({
 /**
  * @summary Get dashboard data for all active students
  */
-export const getDashboardResponseThisWeekEntryDailySabaqMin = 5;
-export const getDashboardResponseThisWeekEntryDailySabaqMax = 5;
+export const getDashboardResponseThisWeekEntryDailyMemorizationMin = 5;
+export const getDashboardResponseThisWeekEntryDailyMemorizationMax = 5;
 
 export const getDashboardResponseThisWeekEntryDailyRmvMin = 5;
 export const getDashboardResponseThisWeekEntryDailyRmvMax = 5;
@@ -598,10 +598,10 @@ export const GetDashboardResponseItem = zod.object({
       memorizationLines: zod.number(),
       currentPage: zod.number().nullish(),
       currentLine: zod.number().nullish(),
-      dailySabaq: zod
+      dailyMemorization: zod
         .array(zod.boolean())
-        .min(getDashboardResponseThisWeekEntryDailySabaqMin)
-        .max(getDashboardResponseThisWeekEntryDailySabaqMax)
+        .min(getDashboardResponseThisWeekEntryDailyMemorizationMin)
+        .max(getDashboardResponseThisWeekEntryDailyMemorizationMax)
         .nullish(),
       dailyRmv: zod
         .array(zod.boolean())
@@ -822,3 +822,21 @@ export const ListSurahsResponseItem = zod.object({
   juz: zod.number(),
 });
 export const ListSurahsResponse = zod.array(ListSurahsResponseItem);
+
+/**
+ * @summary Get the current QF account link status for the program
+ */
+export const GetQfLinkStatusResponse = zod.object({
+  connected: zod.boolean(),
+  displayName: zod.string().nullish(),
+  connectedAt: zod.string().optional(),
+});
+
+/**
+ * @summary Get the program's current Quran Foundation streak
+ */
+export const GetQfLinkStreakResponse = zod.object({
+  connected: zod.boolean(),
+  currentStreak: zod.number(),
+  longestStreak: zod.number().nullish(),
+});

@@ -29,6 +29,8 @@ export * from "./monthlyContributor";
 export * from "./monthlyDecomposition";
 export * from "./mushafPreference";
 export * from "./notYetLogged";
+export * from "./qfLinkStatus";
+export * from "./qfLinkStreak";
 export * from "./ratingDistributionWeek";
 export * from "./ratingDistributionWeekCounts";
 export * from "./student";

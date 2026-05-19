@@ -52,12 +52,12 @@ const WEEK_RATINGS = [
 const EMPTY_5 = (): boolean[] => [false, false, false, false, false];
 const FULL_5 = (): boolean[] => [true, true, true, true, true];
 
-/* ── Category pill — one per Sabaq / RMV / Review ─── */
+/* ── Category pill — one per Memorization / RMV / Review ─── */
 /* Exception-based default: pill shows "5/5" when every present day's
    category is done. Tap to expand inline and toggle individual days. */
 
 interface CategoryPillProps {
-  label: string;             // "Sabaq" | "RMV" | "Review"
+  label: string;             // "Memorization" | "RMV" | "Review"
   values: boolean[];         // length 5 (Mon..Fri)
   absent: boolean[];         // length 5 — disabled cells
   expanded: boolean;
@@ -196,18 +196,18 @@ function ScopeChip({ label, value, placeholder, onChange, aiBorder, aiFilled }: 
 
 interface DayChipProps {
   label: string;          // Mon, Tue, ...
-  sabaq: boolean;
+  memorization: boolean;
   rmv: boolean;
   review: boolean;
   absent: boolean;
   expanded: boolean;
   onToggleExpand: () => void;
-  onChange: (patch: { sabaq?: boolean; rmv?: boolean; review?: boolean; absent?: boolean }) => void;
+  onChange: (patch: { memorization?: boolean; rmv?: boolean; review?: boolean; absent?: boolean }) => void;
 }
 
-function DayChip({ label, sabaq, rmv, review, absent, expanded, onToggleExpand, onChange }: DayChipProps) {
+function DayChip({ label, memorization, rmv, review, absent, expanded, onToggleExpand, onChange }: DayChipProps) {
   // Visual state summary
-  const tasks = [sabaq, rmv, review];
+  const tasks = [memorization, rmv, review];
   const score = tasks.filter(Boolean).length;
   const done = !absent && score === 3;
   const partial = !absent && score > 0 && score < 3;
@@ -249,15 +249,15 @@ function DayChip({ label, sabaq, rmv, review, absent, expanded, onToggleExpand, 
         </div>
         {!absent && (
           <div className={`flex items-center gap-1 ${summaryColor}`}>
-            <Dot on={sabaq} /><Dot on={rmv} /><Dot on={review} />
+            <Dot on={memorization} /><Dot on={rmv} /><Dot on={review} />
           </div>
         )}
       </button>
       {expanded && (
         <div className="border-t border-current/10 px-2 py-2 space-y-1.5">
-          {(["sabaq", "rmv", "review"] as const).map((key) => {
-            const labels = { sabaq: "Sabaq", rmv: "RMV", review: "Review" };
-            const value = key === "sabaq" ? sabaq : key === "rmv" ? rmv : review;
+          {(["memorization", "rmv", "review"] as const).map((key) => {
+            const labels = { memorization: "Memorization", rmv: "RMV", review: "Review" };
+            const value = key === "memorization" ? memorization : key === "rmv" ? rmv : review;
             return (
               <button
                 key={key}
@@ -320,11 +320,11 @@ interface AiParsedResult {
   current_page?: number | null;
   current_line?: number | null;
   daily_tasks?: {
-    mon?: { sabaq?: boolean | null; rmv?: boolean | null; review?: boolean | null };
-    tue?: { sabaq?: boolean | null; rmv?: boolean | null; review?: boolean | null };
-    wed?: { sabaq?: boolean | null; rmv?: boolean | null; review?: boolean | null };
-    thu?: { sabaq?: boolean | null; rmv?: boolean | null; review?: boolean | null };
-    fri?: { sabaq?: boolean | null; rmv?: boolean | null; review?: boolean | null };
+    mon?: { memorization?: boolean | null; rmv?: boolean | null; review?: boolean | null };
+    tue?: { memorization?: boolean | null; rmv?: boolean | null; review?: boolean | null };
+    wed?: { memorization?: boolean | null; rmv?: boolean | null; review?: boolean | null };
+    thu?: { memorization?: boolean | null; rmv?: boolean | null; review?: boolean | null };
+    fri?: { memorization?: boolean | null; rmv?: boolean | null; review?: boolean | null };
   } | null;
   days_absent?: {
     mon?: boolean; tue?: boolean; wed?: boolean; thu?: boolean; fri?: boolean;
@@ -486,7 +486,7 @@ export default function LogWeek() {
   const [currentLine, setCurrentLine] = useState(1);
   // Default the daily grid to "everything went well." Teacher only taps to mark
   // exceptions (absent / missed task) — far less input for a normal week.
-  const [dailySabaq, setDailySabaq] = useState<boolean[]>(FULL_5());
+  const [dailyMemorization, setDailyMemorization] = useState<boolean[]>(FULL_5());
   const [dailyRmv, setDailyRmv] = useState<boolean[]>(FULL_5());
   const [dailyReview, setDailyReview] = useState<boolean[]>(FULL_5());
   const [dailyAbsent, setDailyAbsent] = useState<boolean[]>(EMPTY_5());
@@ -497,7 +497,7 @@ export default function LogWeek() {
   const [submitted, setSubmitted] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   // Per-category expansion: only one pill open at a time.
-  const [expandedCategory, setExpandedCategory] = useState<"sabaq" | "rmv" | "review" | null>(null);
+  const [expandedCategory, setExpandedCategory] = useState<"memorization" | "rmv" | "review" | null>(null);
   // Position is set by tap-to-set in the mushaf preview. The numeric
   // page/line inputs are revealed only when the teacher hits "edit" — the
   // rare-case manual override.
@@ -664,18 +664,18 @@ export default function LogWeek() {
 
       if (parsed.daily_tasks) {
         const tasks = parsed.daily_tasks;
-        const sabaq = dayKeys.map((d) => tasks[d]?.sabaq === true);
+        const memorization = dayKeys.map((d) => tasks[d]?.memorization === true);
         const rmv = dayKeys.map((d) => tasks[d]?.rmv === true);
         const review = dayKeys.map((d) => tasks[d]?.review === true);
 
         const absent = parsed.days_absent;
         if (absent) {
           dayKeys.forEach((d, i) => {
-            if (absent[d]) { sabaq[i] = false; rmv[i] = false; review[i] = false; }
+            if (absent[d]) { memorization[i] = false; rmv[i] = false; review[i] = false; }
           });
         }
 
-        setDailySabaq(sabaq);
+        setDailyMemorization(memorization);
         setDailyRmv(rmv);
         setDailyReview(review);
         filled.add("dailyGrid");
@@ -837,7 +837,7 @@ export default function LogWeek() {
       setMemorizationLines(existingEntry.memorizationLines ?? 0);
       setCurrentPage(existingEntry.currentPage ?? student.currentPage ?? 1);
       setCurrentLine(existingEntry.currentLine ?? student.currentLine ?? 1);
-      setDailySabaq(existingEntry.dailySabaq ?? EMPTY_5());
+      setDailyMemorization(existingEntry.dailyMemorization ?? EMPTY_5());
       setDailyRmv(existingEntry.dailyRmv ?? EMPTY_5());
       setDailyReview(existingEntry.dailyReview ?? EMPTY_5());
       setDailyAbsent(existingEntry.dailyAbsent ?? EMPTY_5());
@@ -852,7 +852,7 @@ export default function LogWeek() {
       setCurrentLine(student.currentLine ?? 1);
       // Assume-normal default: all three tasks done every day. Teacher
       // un-checks any exception.
-      setDailySabaq(FULL_5());
+      setDailyMemorization(FULL_5());
       setDailyRmv(FULL_5());
       setDailyReview(FULL_5());
       setDailyAbsent(EMPTY_5());
@@ -883,7 +883,7 @@ export default function LogWeek() {
 
   const handleCopyLastWeek = () => {
     if (!lastEntry) return;
-    setDailySabaq(lastEntry.dailySabaq ?? EMPTY_5());
+    setDailyMemorization(lastEntry.dailyMemorization ?? EMPTY_5());
     setDailyRmv(lastEntry.dailyRmv ?? EMPTY_5());
     setDailyReview(lastEntry.dailyReview ?? EMPTY_5());
     setDailyAbsent(lastEntry.dailyAbsent ?? EMPTY_5());
@@ -903,7 +903,7 @@ export default function LogWeek() {
     const next = [...dailyAbsent];
     next[i] = !next[i];
     if (next[i]) {
-      const s = [...dailySabaq]; s[i] = false; setDailySabaq(s);
+      const s = [...dailyMemorization]; s[i] = false; setDailyMemorization(s);
       const r = [...dailyRmv]; r[i] = false; setDailyRmv(r);
       const v = [...dailyReview]; v[i] = false; setDailyReview(v);
     }
@@ -918,7 +918,7 @@ export default function LogWeek() {
     if (dailyAbsent[i]) continue;
     daysAttended++;
     let dp = 0;
-    if (dailySabaq[i]) { dp++; totalPoints++; }
+    if (dailyMemorization[i]) { dp++; totalPoints++; }
     if (dailyRmv[i]) { dp++; totalPoints++; }
     if (dailyReview[i]) { dp++; totalPoints++; }
     if (dp === 3) successfulDays++;
@@ -947,7 +947,7 @@ export default function LogWeek() {
           memorizationLines: derivedLines,
           currentPage,
           currentLine,
-          dailySabaq,
+          dailyMemorization,
           dailyRmv,
           dailyReview,
           dailyAbsent,
@@ -1412,7 +1412,7 @@ export default function LogWeek() {
           </div>
           <div className="grid grid-cols-3 gap-1.5 items-start">
             {[
-              { key: "sabaq" as const, label: "Sabaq", values: dailySabaq, setter: setDailySabaq },
+              { key: "memorization" as const, label: "Memorization", values: dailyMemorization, setter: setDailyMemorization },
               { key: "rmv" as const, label: "RMV", values: dailyRmv, setter: setDailyRmv },
               { key: "review" as const, label: "Review", values: dailyReview, setter: setDailyReview },
             ].map((cat) => (

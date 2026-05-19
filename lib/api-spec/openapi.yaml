@@ -18,6 +18,8 @@ tags:
     description: Weekly entry management
   - name: stats
     description: Statistics and KPIs
+  - name: qf-link
+    description: Quran Foundation User-API account link (Streak Tracking integration)
 
 paths:
   /healthz:
@@ -377,6 +379,38 @@ paths:
                 items:
                   $ref: "#/components/schemas/Surah"
 
+  /qf-link/status:
+    get:
+      operationId: getQfLinkStatus
+      tags: [qf-link]
+      summary: Get the current QF account link status for the program
+      responses:
+        "200":
+          description: Link status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QfLinkStatus"
+
+  /qf-link/streak:
+    get:
+      operationId: getQfLinkStreak
+      tags: [qf-link]
+      summary: Get the program's current Quran Foundation streak
+      responses:
+        "200":
+          description: Streak
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QfLinkStreak"
+        "502":
+          description: Upstream QF API failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -413,6 +447,30 @@ components:
       properties:
         authenticated:
           type: boolean
+
+    QfLinkStatus:
+      type: object
+      required: [connected]
+      properties:
+        connected:
+          type: boolean
+        displayName:
+          type: string
+          nullable: true
+        connectedAt:
+          type: string
+
+    QfLinkStreak:
+      type: object
+      required: [connected, currentStreak]
+      properties:
+        connected:
+          type: boolean
+        currentStreak:
+          type: integer
+        longestStreak:
+          type: integer
+          nullable: true
 
     MushafPreference:
       type: string
@@ -566,7 +624,7 @@ components:
         currentLine:
           type: integer
           nullable: true
-        dailySabaq:
+        dailyMemorization:
           $ref: "#/components/schemas/BoolArray5"
           nullable: true
         dailyRmv:
@@ -603,7 +661,7 @@ components:
 
     UpsertWeeklyEntryRequest:
       type: object
-      required: [dailySabaq, dailyRmv, dailyReview, dailyAbsent]
+      required: [dailyMemorization, dailyRmv, dailyReview, dailyAbsent]
       properties:
         memorizationLines:
           type: integer
@@ -618,7 +676,7 @@ components:
           nullable: true
           minimum: 1
           maximum: 15
-        dailySabaq:
+        dailyMemorization:
           $ref: "#/components/schemas/BoolArray5"
         dailyRmv:
           $ref: "#/components/schemas/BoolArray5"

@@ -7,3 +7,4 @@ export * from "./guardians";
 export * from "./weekly-entries";
 export * from "./student-completed-juz";
 export * from "./viewer-access";
+export * from "./qf-account-links";

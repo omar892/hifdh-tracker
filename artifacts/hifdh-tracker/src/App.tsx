@@ -9,6 +9,7 @@ import LogWeek from "@/pages/log-week";
 import StudentProfile from "@/pages/student-profile";
 import ManageStudents from "@/pages/manage-students";
 import ClassStats from "@/pages/class-stats";
+import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -30,6 +31,7 @@ function Router() {
       <Route path="/students/:studentId/profile" component={StudentProfile} />
       <Route path="/manage" component={ManageStudents} />
       <Route path="/stats" component={ClassStats} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );

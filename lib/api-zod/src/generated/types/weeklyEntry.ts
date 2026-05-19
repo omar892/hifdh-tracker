@@ -16,7 +16,7 @@ export interface WeeklyEntry {
   memorizationLines: number;
   currentPage?: number | null;
   currentLine?: number | null;
-  dailySabaq?: BoolArray5 | null;
+  dailyMemorization?: BoolArray5 | null;
   dailyRmv?: BoolArray5 | null;
   dailyReview?: BoolArray5 | null;
   dailyAbsent?: BoolArray5 | null;

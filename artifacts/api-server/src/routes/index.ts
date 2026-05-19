@@ -8,6 +8,8 @@ import aiRouter from "./ai";
 import quranRouter from "./quran";
 import guardiansRouter from "./guardians";
 import viewerAccessRouter from "./viewer-access";
+import rosterRouter from "./roster";
+import qfLinkRouter from "./qf-link";
 
 const router: IRouter = Router();
 
@@ -20,5 +22,7 @@ router.use(aiRouter);
 router.use(quranRouter);
 router.use(guardiansRouter);
 router.use(viewerAccessRouter);
+router.use(rosterRouter);
+router.use(qfLinkRouter);
 
 export default router;

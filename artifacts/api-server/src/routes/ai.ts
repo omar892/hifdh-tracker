@@ -10,11 +10,11 @@ const HIFDH_RULES = `Rules:
 - Student name: {{studentName}}
 - Student's position at START of this week: Page {{currentPage}}, Line {{currentLine}}
 - The program runs Mon–Fri (5 school days)
-- "Sabaq" = new memorization lesson
+- "Memorization" (also called "sabaq") = new memorization lesson
 - "RMV" = recently memorized verses review
 - "Review" = older material review
-- A "successful day" means all 3 tasks (sabaq, RMV, review) were completed
-- Teachers often say things like "did all 3 every day" (meaning sabaq+RMV+review Mon–Fri), "missed review on Wednesday", "only came 4 days", "strong week", "struggled with RMV"
+- A "successful day" means all 3 tasks (memorization, RMV, review) were completed
+- Teachers often say things like "did all 3 every day" (meaning memorization+RMV+review Mon–Fri), "missed review on Wednesday", "only came 4 days", "strong week", "struggled with RMV". They may still use the word "sabaq" instead of "memorization" — treat them as the same task.
 - If the teacher says something like "completed everything" or "perfect week" without specifying days, assume all tasks completed all 5 days
 - If the teacher mentions lines or pages but not both, infer the other: 15 lines = 1 page. Compute current_page from start position + lines memorized if not explicitly stated.
 - week_rating must be one of: "excellent", "strong", "steady", "needs_improvement", "difficult_week" — match the teacher's language to the closest option
@@ -39,11 +39,11 @@ Respond ONLY with a JSON object, no other text:
   "current_page": number or null,
   "current_line": number or null,
   "daily_tasks": {
-    "mon": { "sabaq": bool or null, "rmv": bool or null, "review": bool or null },
-    "tue": { "sabaq": bool or null, "rmv": bool or null, "review": bool or null },
-    "wed": { "sabaq": bool or null, "rmv": bool or null, "review": bool or null },
-    "thu": { "sabaq": bool or null, "rmv": bool or null, "review": bool or null },
-    "fri": { "sabaq": bool or null, "rmv": bool or null, "review": bool or null }
+    "mon": { "memorization": bool or null, "rmv": bool or null, "review": bool or null },
+    "tue": { "memorization": bool or null, "rmv": bool or null, "review": bool or null },
+    "wed": { "memorization": bool or null, "rmv": bool or null, "review": bool or null },
+    "thu": { "memorization": bool or null, "rmv": bool or null, "review": bool or null },
+    "fri": { "memorization": bool or null, "rmv": bool or null, "review": bool or null }
   },
   "days_absent": { "mon": bool, "tue": bool, "wed": bool, "thu": bool, "fri": bool } or null,
   "week_rating": string or null,
@@ -113,7 +113,7 @@ When the teacher tells you information, immediately call the update_entry_fields
 
 After acknowledging what they said, naturally ask about any important missing fields:
 - How many new lines they memorized this week
-- Their daily tasks (sabaq, RMV, review) for each day Mon–Fri
+- Their daily tasks (memorization, RMV, review) for each day Mon–Fri
 - Whether they were absent any days
 - How the week went overall (for the rating)
 - Any notes about the student
@@ -137,11 +137,11 @@ const UPDATE_ENTRY_TOOL: Anthropic.Messages.Tool = {
         type: "object",
         description: "Daily task completion for Mon-Fri",
         properties: {
-          mon: { type: "object", properties: { sabaq: { type: "boolean" }, rmv: { type: "boolean" }, review: { type: "boolean" } } },
-          tue: { type: "object", properties: { sabaq: { type: "boolean" }, rmv: { type: "boolean" }, review: { type: "boolean" } } },
-          wed: { type: "object", properties: { sabaq: { type: "boolean" }, rmv: { type: "boolean" }, review: { type: "boolean" } } },
-          thu: { type: "object", properties: { sabaq: { type: "boolean" }, rmv: { type: "boolean" }, review: { type: "boolean" } } },
-          fri: { type: "object", properties: { sabaq: { type: "boolean" }, rmv: { type: "boolean" }, review: { type: "boolean" } } },
+          mon: { type: "object", properties: { memorization: { type: "boolean" }, rmv: { type: "boolean" }, review: { type: "boolean" } } },
+          tue: { type: "object", properties: { memorization: { type: "boolean" }, rmv: { type: "boolean" }, review: { type: "boolean" } } },
+          wed: { type: "object", properties: { memorization: { type: "boolean" }, rmv: { type: "boolean" }, review: { type: "boolean" } } },
+          thu: { type: "object", properties: { memorization: { type: "boolean" }, rmv: { type: "boolean" }, review: { type: "boolean" } } },
+          fri: { type: "object", properties: { memorization: { type: "boolean" }, rmv: { type: "boolean" }, review: { type: "boolean" } } },
         },
       },
       days_absent: {

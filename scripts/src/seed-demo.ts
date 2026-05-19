@@ -409,7 +409,9 @@ async function main() {
 
     // Insert the student first; we'll update currentPage/Line at the end.
     // Stamp with the bootstrapped program/class/teacher so every query that
-    // scopes by teacher_id finds these students.
+    // scopes by teacher_id finds these students. Profiles with skipRecentWeeks
+    // are explicitly paused (matches their narrative — Maryam is traveling).
+    const initialStatus = profile.skipRecentWeeks ? "paused" : "active";
     const [student] = await db
       .insert(studentsTable)
       .values({
@@ -425,6 +427,9 @@ async function main() {
         defaultReviewAmount: profile.defaultReview ?? null,
         currentPage: profile.startPage,
         currentLine: profile.startLine,
+        status: initialStatus,
+        active: initialStatus === "active",
+        statusChangedAt: initialStatus === "paused" ? new Date() : null,
       })
       .returning();
     console.log(`  + ${profile.name} (id=${student.id})`);
@@ -448,7 +453,7 @@ async function main() {
       const advanced = advancePosition(page, line, lines);
 
       // Daily flags. Most weeks fully successful; occasional exceptions.
-      const dailySabaq = [true, true, true, true, true];
+      const dailyMemorization = [true, true, true, true, true];
       const dailyRmv = [true, true, true, true, true];
       const dailyReview = [true, true, true, true, true];
       const dailyAbsent = [false, false, false, false, false];
@@ -458,12 +463,12 @@ async function main() {
           // "missed RMV/Review only" (less severe).
           if (rand() < 0.4) {
             dailyAbsent[d] = true;
-            dailySabaq[d] = false;
+            dailyMemorization[d] = false;
             dailyRmv[d] = false;
             dailyReview[d] = false;
           } else {
             const which = rand();
-            if (which < 0.4) dailySabaq[d] = false;
+            if (which < 0.4) dailyMemorization[d] = false;
             else if (which < 0.7) dailyRmv[d] = false;
             else dailyReview[d] = false;
           }
@@ -471,9 +476,9 @@ async function main() {
       }
 
       const daysAttended = dailyAbsent.filter((a) => !a).length;
-      const successfulDays = dailySabaq.filter((s) => s).length;
+      const successfulDays = dailyMemorization.filter((s) => s).length;
       const weeklyPoints =
-        dailySabaq.filter((s) => s).length +
+        dailyMemorization.filter((s) => s).length +
         dailyRmv.filter((s) => s).length +
         dailyReview.filter((s) => s).length;
 
@@ -500,7 +505,7 @@ async function main() {
         memorizationLines: Math.max(0, memorizationLines),
         currentPage: advanced.page,
         currentLine: advanced.line,
-        dailySabaq: JSON.stringify(dailySabaq),
+        dailyMemorization: JSON.stringify(dailyMemorization),
         dailyRmv: JSON.stringify(dailyRmv),
         dailyReview: JSON.stringify(dailyReview),
         dailyAbsent: JSON.stringify(dailyAbsent),

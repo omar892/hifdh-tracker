@@ -21,7 +21,7 @@ export interface UpsertWeeklyEntryRequest {
    * @maximum 15
    */
   currentLine?: number | null;
-  dailySabaq: BoolArray5;
+  dailyMemorization: BoolArray5;
   dailyRmv: BoolArray5;
   dailyReview: BoolArray5;
   dailyAbsent: BoolArray5;

@@ -10,6 +10,7 @@ import {
   Moon,
   Sun,
   BookOpen,
+  Settings as SettingsIcon,
 } from "lucide-react";
 
 interface AppLayoutProps {
@@ -120,6 +121,18 @@ export function AppLayout({ children, title }: AppLayoutProps) {
         <div className="border-t border-border/50">
           <SidebarWeekSummary />
           <div className="p-3 pt-1 space-y-0.5">
+            <Link href="/settings" className="block">
+              <div
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm font-medium ${
+                  location === "/settings"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                }`}
+              >
+                <SettingsIcon className="w-[18px] h-[18px]" />
+                Settings
+              </div>
+            </Link>
             <button
               onClick={() => setIsDark((d) => !d)}
               className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground transition-all text-sm font-medium"

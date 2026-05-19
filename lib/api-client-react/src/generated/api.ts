@@ -28,6 +28,8 @@ import type {
   ListWeeklyEntriesParams,
   LoginRequest,
   MessageResponse,
+  QfLinkStatus,
+  QfLinkStreak,
   Student,
   StudentCalendar,
   StudentProjections,
@@ -1565,6 +1567,156 @@ export function useListSurahs<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListSurahsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get the current QF account link status for the program
+ */
+export const getGetQfLinkStatusUrl = () => {
+  return `/api/qf-link/status`;
+};
+
+export const getQfLinkStatus = async (
+  options?: RequestInit,
+): Promise<QfLinkStatus> => {
+  return customFetch<QfLinkStatus>(getGetQfLinkStatusUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetQfLinkStatusQueryKey = () => {
+  return [`/api/qf-link/status`] as const;
+};
+
+export const getGetQfLinkStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getQfLinkStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getQfLinkStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetQfLinkStatusQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getQfLinkStatus>>> = ({
+    signal,
+  }) => getQfLinkStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getQfLinkStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetQfLinkStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getQfLinkStatus>>
+>;
+export type GetQfLinkStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the current QF account link status for the program
+ */
+
+export function useGetQfLinkStatus<
+  TData = Awaited<ReturnType<typeof getQfLinkStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getQfLinkStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetQfLinkStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get the program's current Quran Foundation streak
+ */
+export const getGetQfLinkStreakUrl = () => {
+  return `/api/qf-link/streak`;
+};
+
+export const getQfLinkStreak = async (
+  options?: RequestInit,
+): Promise<QfLinkStreak> => {
+  return customFetch<QfLinkStreak>(getGetQfLinkStreakUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetQfLinkStreakQueryKey = () => {
+  return [`/api/qf-link/streak`] as const;
+};
+
+export const getGetQfLinkStreakQueryOptions = <
+  TData = Awaited<ReturnType<typeof getQfLinkStreak>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getQfLinkStreak>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetQfLinkStreakQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getQfLinkStreak>>> = ({
+    signal,
+  }) => getQfLinkStreak({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getQfLinkStreak>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetQfLinkStreakQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getQfLinkStreak>>
+>;
+export type GetQfLinkStreakQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get the program's current Quran Foundation streak
+ */
+
+export function useGetQfLinkStreak<
+  TData = Awaited<ReturnType<typeof getQfLinkStreak>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getQfLinkStreak>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetQfLinkStreakQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
