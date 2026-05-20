@@ -23,13 +23,13 @@ interface ProfileResponse {
   first_name?: string;
 }
 
-interface StreakResponse {
-  currentStreak?: number;
-  current_streak?: number;
-  current_streak_days?: number;
-  streak?: number;
-  longest_streak?: number;
-  longestStreak?: number;
+/**
+ * Shape of GET /auth/v1/streaks/current-streak-days?type=QURAN:
+ *   { "success": true, "data": { "days": 29 } }
+ */
+interface CurrentStreakResponse {
+  success?: boolean;
+  data?: { days?: number };
 }
 
 export interface ProgramStreak {
@@ -62,13 +62,14 @@ export async function getProfileForProgram(programId: number): Promise<{
 }
 
 export async function getStreakForProgram(programId: number): Promise<ProgramStreak> {
-  // QF exposes both /streaks (with longest) and /streaks/current-streak-days
-  // (just the current count). We use /streaks and tolerate shape variations.
-  const res = await userGet<StreakResponse>(programId, "/streaks");
-  const currentStreak =
-    res.currentStreak ?? res.current_streak ?? res.current_streak_days ?? res.streak ?? 0;
-  const longestStreak = res.longestStreak ?? res.longest_streak ?? null;
-  return { currentStreak, longestStreak };
+  // QF streaks are typed; only QURAN is supported. The endpoint requires the
+  // `type` query param and returns { success, data: { days } }.
+  const res = await userGet<CurrentStreakResponse>(
+    programId,
+    "/streaks/current-streak-days",
+    { query: { type: "QURAN" } },
+  );
+  return { currentStreak: res.data?.days ?? 0, longestStreak: null };
 }
 
 /**
@@ -97,10 +98,17 @@ export async function markActivityDayForProgram(programId: number): Promise<void
   if (link.lastActivityDate === today) return;
 
   try {
+    // QF streaks only count type=QURAN activity days, and that type requires
+    // date + seconds + ranges + mushafId. A weekly-entry save means Quran
+    // memorization activity happened in the program, so a QURAN day is the
+    // honest signal; the fixed range/duration are nominal — the streak is
+    // what matters, not precise verse tracking.
     await userPost(programId, "/activity-days", {
-      type: "LESSON",
+      type: "QURAN",
       date: today,
-      seconds: 0,
+      seconds: 1800,
+      ranges: ["1:1-1:7"],
+      mushafId: 1,
     });
     await db
       .update(qfAccountLinksTable)
