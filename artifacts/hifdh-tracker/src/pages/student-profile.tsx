@@ -232,7 +232,6 @@ function StudentHeader({
     currentPage: number;
     currentLine: number;
     active: boolean;
-    completedJuz?: number[];
   };
   stats:
     | {
@@ -245,8 +244,6 @@ function StudentHeader({
   studentId: number;
   onBack: () => void;
 }) {
-  const juzArr = student.completedJuz ?? [];
-  const juzCount = juzArr.length;
   const paused =
     stats && stats.currentStreakWeeks === 0 && (stats.weeksSinceLastEntry ?? 0) > 2;
 
@@ -283,56 +280,6 @@ function StudentHeader({
         paused={!!paused}
       />
 
-      {/* Progress lives in ONE place: the Juz Map grid. The old standalone
-          header progress bar duplicated it, so its count + % moved onto the
-          map's label row. The finish-timeline track is the complementary
-          view — it adds the halfway/complete milestones + projection. */}
-      <div className="mt-5">
-        <div className="flex items-baseline justify-between mb-2">
-          <p className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest">
-            Juz Map
-          </p>
-          {stats && (
-            <p className="text-[10px] font-bold tracking-wide text-muted-foreground">
-              <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
-                {juzCount}
-              </span>{" "}
-              / {TOTAL_JUZ} juz
-              <span className="text-muted-foreground/50"> · </span>
-              <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
-                {stats.totalQuranPercentage}%
-              </span>
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {Array.from({ length: TOTAL_JUZ }, (_, i) => i + 1).map((juz) => {
-            const completed = juzArr.includes(juz);
-            // "Current juz" highlight: figure out which juz the current page
-            // belongs to. Without a page→juz lookup table here we use the
-            // simple heuristic of `next juz after the highest completed`.
-            const currentJuz = juzCount + 1;
-            const isCurrent = !completed && juz === currentJuz && juzCount < TOTAL_JUZ;
-            return (
-              <div
-                key={juz}
-                className={`w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold transition-colors ${
-                  completed
-                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-sm shadow-emerald-500/20"
-                    : isCurrent
-                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-2 ring-emerald-500/40"
-                      : "bg-secondary/60 text-muted-foreground/40"
-                }`}
-                aria-label={
-                  completed ? `Juz ${juz} complete` : isCurrent ? `Juz ${juz} current` : `Juz ${juz}`
-                }
-              >
-                {juz}
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </header>
   );
 }
@@ -474,17 +421,68 @@ function AttendanceTile({ attendance }: { attendance: StudentAttendanceSignal })
   );
 }
 
-/* ── Section 2: On track to finish ────────────────── */
+/* ── Section 2: Juz timeline (the grid IS the track) ── */
 
-function FinishTimeline({
-  juzCompleted,
-  percentComplete,
+/**
+ * One cell in the juz grid. Hoisted out of JuzTimeline to avoid creating a
+ * fresh component type on every render.
+ */
+function JuzCell({
+  juz,
+  completed,
+  isCurrent,
+}: {
+  juz: number;
+  completed: boolean;
+  isCurrent: boolean;
+}) {
+  return (
+    <div className="relative flex-1 min-w-0">
+      {isCurrent && (
+        /* "Now" callout — sits above the cell; the row has pt-5 to make room */
+        <div className="absolute -top-5 inset-x-0 flex flex-col items-center gap-0.5 pointer-events-none">
+          <span className="text-[9px] font-extrabold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 leading-none">
+            Now
+          </span>
+          <span className="w-0.5 h-1.5 rounded-full bg-emerald-500/60" />
+        </div>
+      )}
+      <div
+        className={`h-7 rounded-md flex items-center justify-center text-[10px] font-bold transition-colors ${
+          completed
+            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-sm shadow-emerald-500/20"
+            : isCurrent
+              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-2 ring-emerald-500/40"
+              : "bg-secondary/60 text-muted-foreground/40"
+        }`}
+        aria-label={
+          completed
+            ? `Juz ${juz} complete`
+            : isCurrent
+              ? `Juz ${juz} (current)`
+              : `Juz ${juz}`
+        }
+      >
+        {juz}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The 30 juz cells ARE the finish timeline. Two rows of 15 cells each:
+ *   Row 1: Juz 1–15  → HALFWAY milestone label at the right end
+ *   Row 2: Juz 16–30 → COMPLETE milestone label at the right end
+ *
+ * The current juz gets a "Now" callout above its cell. Pace + projected dates
+ * live in the footer below the grid so they never clutter the cells themselves.
+ */
+function JuzTimeline({
+  completedJuz,
   projections,
   paceTrend,
 }: {
-  juzCompleted: number;
-  /** Student's overall completion 0–100 — drives their position on the track. */
-  percentComplete: number;
+  completedJuz: number[];
   projections:
     | {
         paceRecent: number;
@@ -492,16 +490,19 @@ function FinishTimeline({
         projectedDateFull?: string | null;
         weeksTo6MonthGoal: number | null;
         weeksToFullQuran: number | null;
-        linesRemaining6Month: number;
-        linesRemainingFull: number;
         trend: "improving" | "declining" | "stable";
       }
     | undefined;
-  /** Pace stability badge reads the SAME trend as the Trajectory tile, so the
-      two characterizations of pace can never disagree. */
+  /** Reads from the same source as the Trajectory tile — can never disagree. */
   paceTrend: TrendDir;
 }) {
-  const hasProjection = projections && projections.paceRecent > 0;
+  const juzCount = completedJuz.length;
+  const currentJuz = Math.min(TOTAL_JUZ, juzCount + 1);
+  const isFullyComplete = juzCount >= TOTAL_JUZ;
+  const halfwayReached = juzCount >= 15;
+  const isComplete = juzCount >= TOTAL_JUZ;
+  const hasProjection = !!projections && projections.paceRecent > 0;
+
   const stabilityLabel =
     paceTrend === "up"
       ? "Pace improving"
@@ -509,15 +510,8 @@ function FinishTimeline({
         ? "Pace easing"
         : "Pace stable";
 
-  // The student's position on the 0→100% completion track. This is the whole
-  // point of the redesign: the marker MOVES with real progress, so a student
-  // who is past the halfway mark visibly sits to the RIGHT of the Halfway tick
-  // instead of being pinned to a fixed "Now" column on the far left.
-  const pos = Math.max(0, Math.min(100, percentComplete));
-  // Keep the floating "Now" callout from overflowing the track's edges.
-  const calloutLeft = Math.max(11, Math.min(89, pos));
-  const halfwayReached = !!projections && projections.linesRemaining6Month === 0;
-  const isComplete = !!projections && projections.linesRemainingFull === 0;
+  const row1 = Array.from({ length: 15 }, (_, i) => i + 1);
+  const row2 = Array.from({ length: 15 }, (_, i) => i + 16);
 
   return (
     <section className="mb-8">
@@ -533,134 +527,113 @@ function FinishTimeline({
         }
       />
 
-      {!hasProjection ? (
-        <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-6 flex items-start gap-3">
-          <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold text-foreground">Not enough data to project yet.</p>
-            <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-              We need a few weeks of logged entries with memorized lines to estimate when this
-              student will reach the halfway mark and full Quran. There's no target completion date
-              field in the schema yet, so the projection here will read off recent pace alone.
-            </p>
+      <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-4 md:p-6">
+        {/* ── Row 1: Juz 1–15 — ends at the HALFWAY milestone ── */}
+        <div>
+          <div className="flex gap-1 pt-5">
+            {row1.map((juz) => (
+              <JuzCell
+                key={juz}
+                juz={juz}
+                completed={completedJuz.includes(juz)}
+                isCurrent={!isFullyComplete && juz === currentJuz}
+              />
+            ))}
+          </div>
+          <div className="flex justify-end mt-2">
+            <div className="text-right">
+              <p className="text-[9px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                Halfway · Juz 15
+              </p>
+              {halfwayReached ? (
+                <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  Reached
+                </p>
+              ) : hasProjection && projections.projectedDate6Month ? (
+                <>
+                  <p className="text-xs font-bold text-foreground mt-0.5">
+                    {formatDate(projections.projectedDate6Month)}
+                  </p>
+                  {projections.weeksTo6MonthGoal != null && (
+                    <p className="text-[9px] text-muted-foreground">
+                      ~{projections.weeksTo6MonthGoal} wks away
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground/60 mt-0.5">—</p>
+              )}
+            </div>
           </div>
         </div>
-      ) : (
-        <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-6">
-          {/* Floating "you are here" callout — sits directly above the
-              student's true position on the track below. */}
-          <div className="relative h-12">
-            <div
-              className="absolute bottom-0 -translate-x-1/2 flex flex-col items-center text-center w-36"
-              style={{ left: `${calloutLeft}%` }}
-            >
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                Now
-              </span>
-              <span className="font-display text-xl font-extrabold text-foreground tracking-tight leading-none mt-0.5">
-                Juz {juzCompleted}
-              </span>
-              <span className="text-[10px] text-muted-foreground mt-1">
-                {formatLines(projections.paceRecent, { short: true })}/wk · 8-wk avg pace
-              </span>
-            </div>
-          </div>
 
-          {/* The track: start (left edge) → Juz 30 (right edge). The emerald
-              fill = progress so far; the big marker = where the student is. */}
-          <div className="relative h-2.5">
-            <div className="absolute inset-0 rounded-full bg-secondary" />
-            <div
-              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400"
-              style={{ width: `${pos}%` }}
-            />
-            {/* Halfway tick — anchored at the true 50% point */}
-            <div className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ left: "50%" }}>
-              <span
-                className={`block w-3.5 h-3.5 rounded-full ring-2 ring-card ${
-                  halfwayReached ? "bg-emerald-600" : "bg-card border-2 border-border"
-                }`}
+        {/* ── Row 2: Juz 16–30 — ends at the COMPLETE milestone ── */}
+        <div className="mt-3">
+          <div className="flex gap-1 pt-5">
+            {row2.map((juz) => (
+              <JuzCell
+                key={juz}
+                juz={juz}
+                completed={completedJuz.includes(juz)}
+                isCurrent={!isFullyComplete && juz === currentJuz}
               />
-            </div>
-            {/* Complete cap — the right end */}
-            <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2">
-              <span
-                className={`block w-3.5 h-3.5 rounded-full ring-2 ring-card ${
-                  isComplete ? "bg-emerald-600" : "bg-yellow-500"
-                }`}
-              />
-            </div>
-            {/* The student marker — biggest, drawn last so it sits on top */}
-            <div
-              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 z-10"
-              style={{ left: `${pos}%` }}
-            >
-              <span className="block w-5 h-5 rounded-full bg-emerald-500 border-2 border-card ring-4 ring-emerald-500/25 shadow-sm" />
-            </div>
+            ))}
           </div>
-
-          {/* Checkpoint labels — below the rail so they never collide with the
-              "Now" callout above. */}
-          <div className="relative h-11 mt-2">
-            <div
-              className="absolute top-0 -translate-x-1/2 flex flex-col items-center text-center w-32"
-              style={{ left: "50%" }}
-            >
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
-                Halfway
-              </span>
-              {halfwayReached ? (
-                <>
-                  <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400 mt-0.5">
-                    Reached
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">Juz 15 cleared</span>
-                </>
-              ) : (
-                <>
-                  <span className="font-bold text-sm text-foreground mt-0.5">
-                    {formatDate(projections.projectedDate6Month)}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {projections.weeksTo6MonthGoal != null
-                      ? `~${projections.weeksTo6MonthGoal} weeks away`
-                      : "Juz 15"}
-                  </span>
-                </>
-              )}
-            </div>
-            <div className="absolute top-0 right-0 flex flex-col items-end text-right w-32">
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
-                Complete
-              </span>
+          <div className="flex justify-end mt-2">
+            <div className="text-right">
+              <p className="text-[9px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                Complete · Juz 30
+              </p>
               {isComplete ? (
+                <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  Done!
+                </p>
+              ) : hasProjection && projections.projectedDateFull ? (
                 <>
-                  <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400 mt-0.5">
-                    Done!
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">Juz 30 complete</span>
+                  <p className="text-xs font-bold text-foreground mt-0.5">
+                    {formatDate(projections.projectedDateFull)}
+                  </p>
+                  {projections.weeksToFullQuran != null && (
+                    <p className="text-[9px] text-muted-foreground">
+                      ~{projections.weeksToFullQuran} wks away
+                    </p>
+                  )}
                 </>
               ) : (
-                <>
-                  <span className="font-bold text-sm text-foreground mt-0.5">
-                    {formatDate(projections.projectedDateFull)}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {projections.weeksToFullQuran != null
-                      ? `~${projections.weeksToFullQuran} weeks away`
-                      : "Juz 30"}
-                  </span>
-                </>
+                <p className="text-xs text-muted-foreground/60 mt-0.5">—</p>
               )}
             </div>
           </div>
+        </div>
 
-          <p className="mt-4 pt-4 border-t border-border/30 text-[11px] text-muted-foreground leading-relaxed">
-            Projections assume the current pace holds — they'll shift week to week as new entries
-            land. Schema doesn't track a target completion date, so this is pace-only.
+        {/* ── Footer: pace summary + footnote ── */}
+        <div className="mt-4 pt-4 border-t border-border/30">
+          {hasProjection ? (
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+                Current pace
+              </span>
+              <span className="text-sm font-extrabold text-foreground">
+                {formatLines(projections.paceRecent, { short: true })}/wk
+              </span>
+              <span className="text-[11px] text-muted-foreground">· 8-week average</span>
+              <span className="ml-auto text-[11px] font-semibold text-muted-foreground">
+                {juzCount} / {TOTAL_JUZ} juz complete
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-start gap-2 mb-2">
+              <Info className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0 mt-0.5" />
+              <p className="text-[11px] text-muted-foreground">
+                Log a few weeks with memorized lines to see pace and projected dates.
+              </p>
+            </div>
+          )}
+          <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
+            Projections assume current pace holds and shift as new entries land.
           </p>
         </div>
-      )}
+      </div>
     </section>
   );
 }
@@ -1024,7 +997,6 @@ export default function StudentProfile() {
             currentPage: student.currentPage,
             currentLine: student.currentLine,
             active: student.active,
-            completedJuz: (student as { completedJuz?: number[] }).completedJuz,
           }}
           stats={stats}
           studentId={studentId}
@@ -1033,9 +1005,8 @@ export default function StudentProfile() {
 
         <VerdictHero assessment={assessment} />
 
-        <FinishTimeline
-          juzCompleted={stats?.juzCompleted ?? 0}
-          percentComplete={stats?.totalQuranPercentage ?? 0}
+        <JuzTimeline
+          completedJuz={(student as { completedJuz?: number[] }).completedJuz ?? []}
           projections={projections}
           paceTrend={assessment.trajectory.trend}
         />
