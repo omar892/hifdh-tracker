@@ -154,6 +154,22 @@ export function useChangeStatus(studentId: number) {
   });
 }
 
+export function useUpdatePosition(studentId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pos: { currentPage: number; currentLine: number }) =>
+      api<{ id: number; currentPage: number; currentLine: number }>(`/api/students/${studentId}`, {
+        method: "PATCH",
+        body: pos,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/students"] });
+      qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      qc.invalidateQueries(); // student/stats endpoints aren't keyed predictably; nuke all
+    },
+  });
+}
+
 // ── Extended stats response from /api/students/:id/stats ───────────────────
 // Just the new fields step 2a added — the existing fields keep their types.
 

@@ -53,7 +53,9 @@ import {
   type StudentQualitySignal,
   type StudentAttendanceSignal,
   type StudentMonthlyComparison,
+  useUpdatePosition,
 } from "@/hooks/use-student-record";
+import { useToast } from "@/hooks/use-toast";
 import {
   RATING_META,
   STATUS_META,
@@ -108,6 +110,114 @@ const VERDICT_TIER_LABEL: Record<VerdictStatus, string> = {
 };
 
 /* ── Section 0: Header ────────────────────────────── */
+
+/**
+ * Current Mushaf position — display + inline edit. This is the only place a
+ * teacher sets a student's page/line; the add-student form no longer asks for
+ * it, so new students arrive at page 1 and get their real position here.
+ */
+function PositionLine({
+  studentId,
+  currentPage,
+  currentLine,
+  paused,
+}: {
+  studentId: number;
+  currentPage: number;
+  currentLine: number;
+  paused: boolean;
+}) {
+  const { toast } = useToast();
+  const update = useUpdatePosition(studentId);
+  const [editing, setEditing] = useState(false);
+  const [page, setPage] = useState(currentPage);
+  const [line, setLine] = useState(currentLine);
+
+  const open = () => {
+    setPage(currentPage);
+    setLine(currentLine);
+    setEditing(true);
+  };
+
+  const save = () => {
+    update.mutate(
+      { currentPage: page, currentLine: line },
+      {
+        onSuccess: () => {
+          setEditing(false);
+          toast({ title: "Position updated" });
+        },
+        onError: (err) =>
+          toast({
+            title: "Failed to update position",
+            description: String((err as Error).message),
+            variant: "destructive",
+          }),
+      },
+    );
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 flex-wrap text-sm mt-0.5">
+        <label className="flex items-center gap-1.5 text-muted-foreground font-medium">
+          Page
+          <input
+            type="number"
+            min={1}
+            max={604}
+            value={page}
+            onChange={(e) => setPage(Math.max(1, Math.min(604, Number(e.target.value))))}
+            className="w-16 px-2 py-1 rounded-lg bg-background border-2 border-border text-sm font-mono text-foreground focus:border-primary outline-none"
+          />
+        </label>
+        <label className="flex items-center gap-1.5 text-muted-foreground font-medium">
+          Line
+          <input
+            type="number"
+            min={1}
+            max={15}
+            value={line}
+            onChange={(e) => setLine(Math.max(1, Math.min(15, Number(e.target.value))))}
+            className="w-14 px-2 py-1 rounded-lg bg-background border-2 border-border text-sm font-mono text-foreground focus:border-primary outline-none"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={save}
+          disabled={update.isPending}
+          className="px-3 py-1 rounded-lg bg-primary text-primary-foreground text-xs font-bold disabled:opacity-50"
+        >
+          {update.isPending ? "Saving…" : "Save"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          className="px-3 py-1 rounded-lg border border-border text-xs font-bold text-muted-foreground hover:text-foreground"
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <p className="text-sm text-muted-foreground font-medium flex items-center gap-1.5">
+      {paused ? "Last position:" : "Working on:"}{" "}
+      <span className="text-foreground font-semibold">
+        Page {currentPage}, Line {currentLine}
+      </span>
+      <button
+        type="button"
+        onClick={open}
+        className="p-1 rounded-md text-muted-foreground/60 hover:text-primary hover:bg-secondary transition-colors"
+        aria-label="Edit current position"
+      >
+        <Pencil className="w-3.5 h-3.5" />
+      </button>
+    </p>
+  );
+}
 
 function StudentHeader({
   student,
@@ -166,12 +276,12 @@ function StudentHeader({
         />
       </div>
 
-      <p className="text-sm text-muted-foreground font-medium">
-        {paused ? "Last position:" : "Working on:"}{" "}
-        <span className="text-foreground font-semibold">
-          Page {student.currentPage}, Line {student.currentLine}
-        </span>
-      </p>
+      <PositionLine
+        studentId={studentId}
+        currentPage={student.currentPage}
+        currentLine={student.currentLine}
+        paused={!!paused}
+      />
 
       {stats && (
         <div className="mt-4 flex items-center gap-3">
@@ -367,10 +477,13 @@ function AttendanceTile({ attendance }: { attendance: StudentAttendanceSignal })
 
 function FinishTimeline({
   juzCompleted,
+  percentComplete,
   projections,
   paceTrend,
 }: {
   juzCompleted: number;
+  /** Student's overall completion 0–100 — drives their position on the track. */
+  percentComplete: number;
   projections:
     | {
         paceRecent: number;
@@ -388,13 +501,22 @@ function FinishTimeline({
   paceTrend: TrendDir;
 }) {
   const hasProjection = projections && projections.paceRecent > 0;
-  const trendDir: TrendDir = paceTrend;
   const stabilityLabel =
     paceTrend === "up"
       ? "Pace improving"
       : paceTrend === "down"
         ? "Pace easing"
         : "Pace stable";
+
+  // The student's position on the 0→100% completion track. This is the whole
+  // point of the redesign: the marker MOVES with real progress, so a student
+  // who is past the halfway mark visibly sits to the RIGHT of the Halfway tick
+  // instead of being pinned to a fixed "Now" column on the far left.
+  const pos = Math.max(0, Math.min(100, percentComplete));
+  // Keep the floating "Now" callout from overflowing the track's edges.
+  const calloutLeft = Math.max(11, Math.min(89, pos));
+  const halfwayReached = !!projections && projections.linesRemaining6Month === 0;
+  const isComplete = !!projections && projections.linesRemainingFull === 0;
 
   return (
     <section className="mb-8">
@@ -404,7 +526,7 @@ function FinishTimeline({
         right={
           hasProjection ? (
             <span className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full bg-secondary text-muted-foreground">
-              <TrendArrow direction={trendDir} className="w-3 h-3" /> {stabilityLabel}
+              <TrendArrow direction={paceTrend} className="w-3 h-3" /> {stabilityLabel}
             </span>
           ) : null
         }
@@ -424,111 +546,121 @@ function FinishTimeline({
         </div>
       ) : (
         <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-6">
-          <div className="grid grid-cols-3 gap-3 md:gap-6 relative">
-            {/* Connector line behind the dots. Sits at ~the dot's vertical
-                center so the milestones read as one timeline. */}
+          {/* Floating "you are here" callout — sits directly above the
+              student's true position on the track below. */}
+          <div className="relative h-12">
             <div
-              aria-hidden
-              className="absolute left-[16%] right-[16%] top-[34px] h-0.5 bg-gradient-to-r from-emerald-500/30 via-primary/30 to-yellow-500/30"
-            />
-            <TimelineStep
-              tone="now"
-              label="Now"
-              primary={`Juz ${juzCompleted}`}
-              secondary={`${formatLines(projections.paceRecent, { short: true })}/wk`}
-              caption="8-week avg pace"
-            />
-            <TimelineStep
-              tone="mid"
-              label="Halfway"
-              primary={
-                projections.linesRemaining6Month === 0
-                  ? "Reached"
-                  : projections.projectedDate6Month
-                    ? formatDate(projections.projectedDate6Month)
-                    : "—"
-              }
-              secondary={
-                projections.linesRemaining6Month === 0
-                  ? "Juz 15 — done"
-                  : projections.weeksTo6MonthGoal != null
-                    ? `~${projections.weeksTo6MonthGoal} weeks away`
-                    : ""
-              }
-              caption={
-                projections.linesRemaining6Month === 0 ? "" : `Juz 15 · ${formatLines(projections.linesRemaining6Month, { short: true, showRemainder: false })} to go`
-              }
-            />
-            <TimelineStep
-              tone="end"
-              label="Complete"
-              primary={
-                projections.linesRemainingFull === 0
-                  ? "Done!"
-                  : projections.projectedDateFull
-                    ? formatDate(projections.projectedDateFull)
-                    : "—"
-              }
-              secondary={
-                projections.linesRemainingFull === 0
-                  ? "Juz 30 — مَا شَاء اللهُ"
-                  : projections.weeksToFullQuran != null
-                    ? `~${projections.weeksToFullQuran} weeks away`
-                    : ""
-              }
-              caption={
-                projections.linesRemainingFull === 0
-                  ? ""
-                  : `Juz 30 · ${formatLines(projections.linesRemainingFull, { short: true, showRemainder: false })} to go`
-              }
-            />
+              className="absolute bottom-0 -translate-x-1/2 flex flex-col items-center text-center w-36"
+              style={{ left: `${calloutLeft}%` }}
+            >
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                Now
+              </span>
+              <span className="font-display text-xl font-extrabold text-foreground tracking-tight leading-none mt-0.5">
+                Juz {juzCompleted}
+              </span>
+              <span className="text-[10px] text-muted-foreground mt-1">
+                {formatLines(projections.paceRecent, { short: true })}/wk · 8-wk avg pace
+              </span>
+            </div>
           </div>
 
-          <p className="mt-5 pt-4 border-t border-border/30 text-[11px] text-muted-foreground leading-relaxed">
+          {/* The track: start (left edge) → Juz 30 (right edge). The emerald
+              fill = progress so far; the big marker = where the student is. */}
+          <div className="relative h-2.5">
+            <div className="absolute inset-0 rounded-full bg-secondary" />
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400"
+              style={{ width: `${pos}%` }}
+            />
+            {/* Halfway tick — anchored at the true 50% point */}
+            <div className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ left: "50%" }}>
+              <span
+                className={`block w-3.5 h-3.5 rounded-full ring-2 ring-card ${
+                  halfwayReached ? "bg-emerald-600" : "bg-card border-2 border-border"
+                }`}
+              />
+            </div>
+            {/* Complete cap — the right end */}
+            <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2">
+              <span
+                className={`block w-3.5 h-3.5 rounded-full ring-2 ring-card ${
+                  isComplete ? "bg-emerald-600" : "bg-yellow-500"
+                }`}
+              />
+            </div>
+            {/* The student marker — biggest, drawn last so it sits on top */}
+            <div
+              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 z-10"
+              style={{ left: `${pos}%` }}
+            >
+              <span className="block w-5 h-5 rounded-full bg-emerald-500 border-2 border-card ring-4 ring-emerald-500/25 shadow-sm" />
+            </div>
+          </div>
+
+          {/* Checkpoint labels — below the rail so they never collide with the
+              "Now" callout above. */}
+          <div className="relative h-11 mt-2">
+            <div
+              className="absolute top-0 -translate-x-1/2 flex flex-col items-center text-center w-32"
+              style={{ left: "50%" }}
+            >
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                Halfway
+              </span>
+              {halfwayReached ? (
+                <>
+                  <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400 mt-0.5">
+                    Reached
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">Juz 15 cleared</span>
+                </>
+              ) : (
+                <>
+                  <span className="font-bold text-sm text-foreground mt-0.5">
+                    {formatDate(projections.projectedDate6Month)}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {projections.weeksTo6MonthGoal != null
+                      ? `~${projections.weeksTo6MonthGoal} weeks away`
+                      : "Juz 15"}
+                  </span>
+                </>
+              )}
+            </div>
+            <div className="absolute top-0 right-0 flex flex-col items-end text-right w-32">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                Complete
+              </span>
+              {isComplete ? (
+                <>
+                  <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400 mt-0.5">
+                    Done!
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">Juz 30 complete</span>
+                </>
+              ) : (
+                <>
+                  <span className="font-bold text-sm text-foreground mt-0.5">
+                    {formatDate(projections.projectedDateFull)}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {projections.weeksToFullQuran != null
+                      ? `~${projections.weeksToFullQuran} weeks away`
+                      : "Juz 30"}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <p className="mt-4 pt-4 border-t border-border/30 text-[11px] text-muted-foreground leading-relaxed">
             Projections assume the current pace holds — they'll shift week to week as new entries
             land. Schema doesn't track a target completion date, so this is pace-only.
           </p>
         </div>
       )}
     </section>
-  );
-}
-
-function TimelineStep({
-  tone,
-  label,
-  primary,
-  secondary,
-  caption,
-}: {
-  tone: "now" | "mid" | "end";
-  label: string;
-  primary: string;
-  secondary: string;
-  caption: string;
-}) {
-  const dotColor =
-    tone === "now"
-      ? "bg-emerald-500 ring-emerald-500/20"
-      : tone === "mid"
-        ? "bg-primary ring-primary/20"
-        : "bg-yellow-500 ring-yellow-500/20";
-  return (
-    <div className="flex flex-col items-center text-center relative z-10">
-      <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground mb-2">
-        {label}
-      </span>
-      <span className={`w-4 h-4 rounded-full ring-4 ${dotColor} mb-3`} aria-hidden />
-      <span className="font-display text-xl font-extrabold text-foreground tracking-tight">
-        {primary}
-      </span>
-      {secondary && (
-        <span className="text-xs font-medium text-muted-foreground mt-0.5">{secondary}</span>
-      )}
-      {caption && (
-        <span className="text-[10px] text-muted-foreground/80 mt-1">{caption}</span>
-      )}
-    </div>
   );
 }
 
@@ -902,6 +1034,7 @@ export default function StudentProfile() {
 
         <FinishTimeline
           juzCompleted={stats?.juzCompleted ?? 0}
+          percentComplete={stats?.totalQuranPercentage ?? 0}
           projections={projections}
           paceTrend={assessment.trajectory.trend}
         />

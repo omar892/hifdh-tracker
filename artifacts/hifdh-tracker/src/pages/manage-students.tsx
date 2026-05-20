@@ -126,8 +126,6 @@ function RosterRowView({ row }: { row: RosterRow }) {
 function QuickAddForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: () => void }) {
   const [name, setName] = useState("");
   const [gender, setGender] = useState<Gender>(null);
-  const [page, setPage] = useState(1);
-  const [line, setLine] = useState(1);
   const qc = useQueryClient();
   const { toast } = useToast();
   const create = useCreateStudent({
@@ -150,8 +148,10 @@ function QuickAddForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
       data: {
         name: name.trim(),
         gender: gender,
-        currentPage: page,
-        currentLine: line,
+        // New students start at page 1; the real position is set on the
+        // student record page after adding.
+        currentPage: 1,
+        currentLine: 1,
         startDate: new Date().toISOString().split("T")[0],
         completedJuz: [],
       },
@@ -170,37 +170,17 @@ function QuickAddForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
         required
         className="w-full mb-2 px-3 py-2 rounded-xl bg-background border-2 border-border focus:border-primary outline-none text-foreground"
       />
-      <div className="grid grid-cols-3 gap-2 mb-2">
-        <select
-          value={gender ?? ""}
-          onChange={(e) => setGender((e.target.value || null) as Gender)}
-          className="px-2 py-2 rounded-xl bg-background border-2 border-border text-sm focus:border-primary outline-none"
-        >
-          <option value="">Gender</option>
-          <option value="male">Male</option>
-          <option value="female">Female</option>
-        </select>
-        <input
-          type="number"
-          min={1}
-          max={604}
-          value={page}
-          onChange={(e) => setPage(Math.max(1, Math.min(604, Number(e.target.value))))}
-          placeholder="Page"
-          className="px-2 py-2 rounded-xl bg-background border-2 border-border text-sm font-mono focus:border-primary outline-none"
-        />
-        <input
-          type="number"
-          min={1}
-          max={15}
-          value={line}
-          onChange={(e) => setLine(Math.max(1, Math.min(15, Number(e.target.value))))}
-          placeholder="Line"
-          className="px-2 py-2 rounded-xl bg-background border-2 border-border text-sm font-mono focus:border-primary outline-none"
-        />
-      </div>
+      <select
+        value={gender ?? ""}
+        onChange={(e) => setGender((e.target.value || null) as Gender)}
+        className="w-full mb-2 px-3 py-2 rounded-xl bg-background border-2 border-border text-sm focus:border-primary outline-none"
+      >
+        <option value="">Gender</option>
+        <option value="male">Male</option>
+        <option value="female">Female</option>
+      </select>
       <p className="text-[10px] text-muted-foreground/60 mb-3">
-        More fields (mushaf, defaults, completed juz) on the student record after adding.
+        Set current page, mushaf, and other details on the student record after adding.
       </p>
       <div className="flex gap-2">
         <button
