@@ -283,27 +283,28 @@ function StudentHeader({
         paused={!!paused}
       />
 
-      {stats && (
-        <div className="mt-4 flex items-center gap-3">
-          <div className="flex-1 max-w-md h-2 bg-primary/8 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all"
-              style={{ width: `${Math.min(100, stats.totalQuranPercentage)}%` }}
-            />
-          </div>
-          <span className="text-sm font-extrabold text-primary tabular-nums">
-            {stats.totalQuranPercentage}%
-          </span>
-          <span className="text-xs text-muted-foreground font-medium">
-            {juzCount}/{TOTAL_JUZ} juz
-          </span>
-        </div>
-      )}
-
+      {/* Progress lives in ONE place: the Juz Map grid. The old standalone
+          header progress bar duplicated it, so its count + % moved onto the
+          map's label row. The finish-timeline track is the complementary
+          view — it adds the halfway/complete milestones + projection. */}
       <div className="mt-5">
-        <p className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest mb-2">
-          Juz Map
-        </p>
+        <div className="flex items-baseline justify-between mb-2">
+          <p className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest">
+            Juz Map
+          </p>
+          {stats && (
+            <p className="text-[10px] font-bold tracking-wide text-muted-foreground">
+              <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+                {juzCount}
+              </span>{" "}
+              / {TOTAL_JUZ} juz
+              <span className="text-muted-foreground/50"> · </span>
+              <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+                {stats.totalQuranPercentage}%
+              </span>
+            </p>
+          )}
+        </div>
         <div className="flex flex-wrap gap-1">
           {Array.from({ length: TOTAL_JUZ }, (_, i) => i + 1).map((juz) => {
             const completed = juzArr.includes(juz);
