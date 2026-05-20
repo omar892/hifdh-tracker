@@ -15,15 +15,6 @@ import { useParams, useLocation, Link } from "wouter";
 import { useMemo, useState } from "react";
 import { format, subMonths, addMonths } from "date-fns";
 import {
-  Bar,
-  BarChart,
-  Cell,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-  Tooltip,
-} from "recharts";
-import {
   ArrowLeft,
   AlertTriangle,
   AlertCircle,
@@ -80,10 +71,6 @@ import { formatLines } from "@/lib/format";
 /* ── Local constants / helpers ────────────────────── */
 
 const TOTAL_JUZ = 30;
-// The visual reference uses 12 weeks of bars in the record section — wide
-// enough to see a real trend, narrow enough that bars are individually
-// readable on iPad. We clip whatever the API returns to this window.
-const RECORD_BARS_MAX = 12;
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -598,120 +585,29 @@ function MonthSoFarLine({
   );
 }
 
-function RecordChart({ weeks }: { weeks: RecordWeek[] }) {
-  // Clip to most-recent N for legibility. Recharts wants oldest → newest so
-  // the X axis reads left → right, which matches how a teacher scans time.
-  // Format the bar label in UTC so the Monday date matches what the table
-  // shows — using local-tz `format(new Date(d+"Z"), "MMM d")` shifts the
-  // label back a day for anyone west of UTC.
-  const utcMonthDay = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-  const bars = weeks.slice(-RECORD_BARS_MAX).map((w) => ({
-    key: w.weekStartDate,
-    label: utcMonthDay.format(new Date(w.weekStartDate + "T00:00:00Z")),
-    lines: w.hasEntry ? (w.linesMemorized ?? 0) : 0,
-    rating: w.weekRating ?? null,
-    hasEntry: w.hasEntry,
-    rangeLabel: formatWeekRange(w.weekStartDate, w.weekEndDate),
-  }));
-
-  const anyLogged = bars.some((b) => b.hasEntry);
-  if (!anyLogged) {
-    return (
-      <div className="bg-secondary/30 rounded-xl py-10 text-center">
-        <p className="text-sm text-muted-foreground italic">No weeks logged in this month.</p>
-      </div>
-    );
-  }
-
-  const fillFor = (rating: string | null, hasEntry: boolean) => {
-    if (!hasEntry) return "var(--secondary)";
-    if (!rating) return "hsl(217, 91%, 60%)"; // entry but no rating → neutral blue
-    const meta = RATING_META[rating];
-    if (!meta) return "hsl(217, 91%, 60%)";
-    // Map the tailwind bar class onto a hex stroke for Recharts (Recharts can't
-    // read tailwind classes). Keeping the source of truth in RATING_META means
-    // a palette change there propagates here too.
-    const map: Record<string, string> = {
-      "bg-yellow-500": "#eab308",
-      "bg-emerald-500": "#10b981",
-      "bg-blue-500": "#3b82f6",
-      "bg-orange-500": "#f97316",
-      "bg-red-500": "#ef4444",
-    };
-    return map[meta.bar] ?? "#3b82f6";
-  };
-
-  return (
-    <div className="bg-card border border-border/50 rounded-2xl p-4">
-      <div className="h-44">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={bars} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-            <XAxis
-              dataKey="label"
-              tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis hide />
-            <Tooltip
-              cursor={{ fill: "var(--secondary)", opacity: 0.4 }}
-              contentStyle={{
-                background: "var(--card)",
-                border: "1px solid var(--border)",
-                borderRadius: 12,
-                fontSize: 12,
-                padding: "8px 10px",
-              }}
-              labelFormatter={(_, payload) => payload?.[0]?.payload?.rangeLabel ?? ""}
-              formatter={(value: number, _name, payload) => {
-                const rating = (payload?.payload as { rating?: string | null })?.rating;
-                const label = rating ? (RATING_META[rating]?.label ?? "—") : "no rating";
-                return [`${formatLines(value)} · ${label}`, "Logged"];
-              }}
-            />
-            <Bar dataKey="lines" radius={[4, 4, 0, 0]} maxBarSize={28}>
-              {bars.map((b) => (
-                <Cell key={b.key} fill={fillFor(b.rating, b.hasEntry)} fillOpacity={b.hasEntry ? 0.95 : 0.25} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Legend */}
-      <div className="mt-3 pt-3 border-t border-border/30 flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
-        {(["excellent", "strong", "steady", "needs_improvement", "difficult_week"] as const).map(
-          (key) => (
-            <span key={key} className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-sm ${RATING_META[key].bar}`} />
-              <span className="text-muted-foreground">{RATING_META[key].label}</span>
-            </span>
-          ),
-        )}
-      </div>
-    </div>
-  );
-}
+// Column template shared by the record table's header and its rows. The
+// "Memorized" column is wide enough to hold the in-row bar plus the value.
+const RECORD_COLS = "grid-cols-[minmax(0,1fr)_auto_auto_minmax(132px,1.3fr)_28px]";
 
 function RecordTable({
   weeks,
-  studentId,
   onEdit,
 }: {
   weeks: RecordWeek[];
-  studentId: number;
   onEdit: (weekStart: string) => void;
 }) {
   if (weeks.length === 0) {
     return <p className="text-center text-muted-foreground py-6 text-sm">No weeks in this month.</p>;
   }
+  // Bars are scaled against the busiest logged week in view, so a bar's length
+  // reads as "how this week compares to the rest of the month".
+  const maxLines = Math.max(
+    1,
+    ...weeks.filter((w) => w.hasEntry).map((w) => w.linesMemorized ?? 0),
+  );
   return (
-    <div className="mt-4 bg-card border border-border/50 rounded-2xl overflow-hidden">
-      <div className="grid grid-cols-[1fr_auto_auto_auto_28px] gap-3 px-4 py-2.5 bg-secondary/40 border-b border-border/40 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+    <div className="bg-card border border-border/50 rounded-2xl overflow-hidden">
+      <div className={`grid ${RECORD_COLS} gap-3 px-4 py-2.5 bg-secondary/40 border-b border-border/40 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground`}>
         <span>Week</span>
         <span>Rating</span>
         <span>Days</span>
@@ -721,10 +617,20 @@ function RecordTable({
       <ul className="divide-y divide-border/30">
         {weeks.map((w) => {
           const range = formatWeekRange(w.weekStartDate, w.weekEndDate);
+          const lines = w.linesMemorized ?? 0;
+          // In-row bar — replaces the standalone chart. Width = lines logged
+          // that week vs the month's busiest week; colour = that week's
+          // rating. The rating chip in the same row decodes the colour, so
+          // no separate legend is needed.
+          const barColor = w.weekRating
+            ? RATING_META[w.weekRating]?.bar ?? "bg-blue-500"
+            : "bg-blue-500";
+          const barPct =
+            w.hasEntry && lines > 0 ? Math.max(6, Math.round((lines / maxLines) * 100)) : 0;
           return (
             <li
               key={w.weekStartDate}
-              className={`grid grid-cols-[1fr_auto_auto_auto_28px] gap-3 px-4 py-3 items-center hover:bg-secondary/30 transition-colors group ${
+              className={`grid ${RECORD_COLS} gap-3 px-4 py-2.5 items-center hover:bg-secondary/30 transition-colors group ${
                 w.hasEntry ? "" : "bg-secondary/10"
               }`}
             >
@@ -754,8 +660,18 @@ function RecordTable({
                   <span className="text-muted-foreground/60">—</span>
                 )}
               </div>
-              <div className="text-xs tabular-nums font-bold text-primary">
-                {w.hasEntry ? formatLines(w.linesMemorized ?? 0, { short: true }) : ""}
+              <div className="flex items-center gap-2.5">
+                <div className="flex-1 min-w-[40px] h-2.5 rounded-full bg-secondary/70 overflow-hidden">
+                  {barPct > 0 && (
+                    <div
+                      className={`h-full rounded-full ${barColor}`}
+                      style={{ width: `${barPct}%` }}
+                    />
+                  )}
+                </div>
+                <span className="w-[54px] shrink-0 text-right text-xs tabular-nums font-bold text-foreground">
+                  {w.hasEntry ? formatLines(lines, { short: true }) : "—"}
+                </span>
               </div>
               <button
                 type="button"
@@ -836,10 +752,7 @@ function RecordSection({
           <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
-        <>
-          <RecordChart weeks={calendar?.weeks ?? []} />
-          <RecordTable weeks={calendar?.weeks ?? []} studentId={studentId} onEdit={onEditWeek} />
-        </>
+        <RecordTable weeks={calendar?.weeks ?? []} onEdit={onEditWeek} />
       )}
     </section>
   );
