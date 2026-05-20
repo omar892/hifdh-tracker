@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { BookOpen, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import { motion } from "framer-motion";
+import { LawhMark } from "@/components/lawh-mark";
 
 export default function Login() {
   const [password, setPassword] = useState("");
@@ -36,14 +37,14 @@ export default function Login() {
         <div className="absolute inset-0 bg-black/10 z-10" />
         <img
           src={`${import.meta.env.BASE_URL}images/login-bg.png`}
-          alt="Hifdh Tracker Logo"
+          alt="Lawh"
           className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-40"
         />
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-white p-12 text-center">
-          <BookOpen className="w-24 h-24 mb-8 opacity-90" />
-          <h1 className="font-display font-bold text-5xl mb-4">Quran Hifdh Tracker</h1>
+          <LawhMark size={112} className="mb-8" />
+          <h1 className="font-display font-bold text-5xl mb-4">Lawh</h1>
           <p className="text-xl text-white/80 max-w-md font-sans">
-            A minimalist, distraction-free environment for tracking your students' memorization progress.
+            A quiet home for what your students carry.
           </p>
         </div>
       </div>
@@ -56,10 +57,8 @@ export default function Login() {
           className="w-full max-w-md"
         >
           <div className="lg:hidden flex flex-col items-center mb-10">
-            <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25 mb-6">
-              <BookOpen className="text-white w-8 h-8" />
-            </div>
-            <h1 className="font-display font-bold text-3xl text-foreground">Hifdh Tracker</h1>
+            <LawhMark size={64} className="mb-6" />
+            <h1 className="font-display font-bold text-3xl text-foreground">Lawh</h1>
           </div>
 
           <div className="bg-card dark:bg-secondary p-8 sm:p-10 rounded-3xl shadow-xl shadow-black/5 dark:shadow-black/40 border border-border/50 dark:border-border">

@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "Quran Hifdh Tracker"
+title = "Lawh"
 version = "1.0.0"
 id = "artifacts/hifdh-tracker"
 router = "path"

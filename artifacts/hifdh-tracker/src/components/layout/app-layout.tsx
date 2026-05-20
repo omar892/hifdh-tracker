@@ -9,9 +9,9 @@ import {
   LogOut,
   Moon,
   Sun,
-  BookOpen,
   Settings as SettingsIcon,
 } from "lucide-react";
+import { LawhMark } from "@/components/lawh-mark";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -66,6 +66,10 @@ export function AppLayout({ children, title }: AppLayoutProps) {
   });
 
   useEffect(() => {
+    document.title = title ? `Lawh · ${title}` : "Lawh";
+  }, [title]);
+
+  useEffect(() => {
     const root = document.documentElement;
     if (isDark) {
       root.classList.add("dark");
@@ -87,12 +91,10 @@ export function AppLayout({ children, title }: AppLayoutProps) {
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-card border-r border-border/50 z-20 shrink-0">
         <div className="p-6 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-            <BookOpen className="text-white w-5 h-5" />
-          </div>
+          <LawhMark size={40} />
           <div>
-            <span className="font-display font-extrabold text-lg text-foreground tracking-tight block leading-none">Hifdh</span>
-            <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Tracker</span>
+            <span className="font-display font-extrabold text-lg text-foreground tracking-tight block leading-none">Lawh</span>
+            <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Hifdh</span>
           </div>
         </div>
 
@@ -155,10 +157,8 @@ export function AppLayout({ children, title }: AppLayoutProps) {
         {/* Mobile header */}
         <header className="md:hidden flex items-center justify-between px-4 py-3 bg-card/80 backdrop-blur-lg border-b border-border/30 z-20 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-sm shadow-emerald-500/30">
-              <BookOpen className="text-white w-4 h-4" />
-            </div>
-            <span className="font-display font-extrabold text-base tracking-tight">{title || "Hifdh Tracker"}</span>
+            <LawhMark size={32} />
+            <span className="font-display font-extrabold text-base tracking-tight">{title || "Lawh"}</span>
           </div>
           <button
             aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
